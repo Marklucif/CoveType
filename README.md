@@ -109,6 +109,17 @@ The app will be at `dist/TypeNo.app`. Move it to `/Applications/` for persistent
 | Check for updates | Menu bar → Check for Updates... |
 | Quit | Menu bar → Quit (`⌘Q`) |
 
+## Uninstall
+
+1. Quit TypeNo from the menu bar
+2. Drag `TypeNo.app` to Trash from `/Applications`
+3. Remove the Coli speech engine and cached models:
+
+```bash
+rm -rf ~/.coli/
+npm uninstall -g @marswave/coli
+```
+
 ## Design Philosophy
 
 TypeNo does one thing: voice → text → paste. No extra UI, no preferences, no configuration. The fastest way to type is to not type at all.

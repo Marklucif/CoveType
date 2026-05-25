@@ -108,6 +108,17 @@ scripts/build_app.sh
 | 检查更新 | 菜单栏 → Check for Updates... |
 | 退出 | 菜单栏 → Quit（`⌘Q`） |
 
+## 卸载
+
+1. 从菜单栏退出 TypeNo
+2. 将 `TypeNo.app` 从 `/Applications` 拖到废纸篓
+3. 移除 Coli 语音引擎和缓存的模型：
+
+```bash
+rm -rf ~/.coli/
+npm uninstall -g @marswave/coli
+```
+
 ## 设计理念
 
 TypeNo 只做一件事：语音 → 文字 → 粘贴。没有多余的 UI，没有偏好设置，没有配置项。最快的打字方式就是不打字。

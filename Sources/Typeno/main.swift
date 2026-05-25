@@ -905,6 +905,22 @@ final class AudioRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, AVCap
         audioContextLock.unlock()
 
         session.startRunning()
+
+        // Wait for AVCaptureSession to stabilize audio format before recording.
+        // Without this, the AAC encoder may initialize with 0 Hz sample rate when
+        // the session is still negotiating the hardware format (especially during
+        // device switching or with external mics), producing empty recordings.
+        // See: https://github.com/marswaveai/TypeNo/issues/43
+        let startTime = Date()
+        while Date().timeIntervalSince(startTime) < 1.0 {
+            if let connection = output.connections.first,
+               let _ = connection.audioChannels.first,
+               connection.isActive {
+                break
+            }
+            Thread.sleep(forTimeInterval: 0.01)
+        }
+
         output.startRecording(to: url, outputFileType: .m4a, recordingDelegate: self)
         return url
     }
@@ -1514,20 +1530,44 @@ final class ColiASRService: @unchecked Sendable {
     private static func detectIncompleteModelDownload() -> String? {
         let home = FileManager.default.homeDirectoryForCurrentUser
         let modelsDir = home.appendingPathComponent(".coli/models", isDirectory: true)
-        let senseVoiceDir = modelsDir.appendingPathComponent(
-            "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17",
-            isDirectory: true
-        )
+        let modelDirName = "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17"
+        let senseVoiceDir = modelsDir.appendingPathComponent(modelDirName, isDirectory: true)
         let senseVoiceCheckFile = senseVoiceDir.appendingPathComponent("model.int8.onnx")
-        let senseVoiceArchive = modelsDir.appendingPathComponent(
-            "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17.tar.bz2"
-        )
+        let senseVoiceArchive = modelsDir.appendingPathComponent("\(modelDirName).tar.bz2")
 
         let fm = FileManager.default
-        if !fm.fileExists(atPath: senseVoiceCheckFile.path) && fm.fileExists(atPath: senseVoiceArchive.path) {
-            return "Coli's first model download looks incomplete in ~/.coli/models. Delete the partial archive and try transcribing again."
+        let archiveExists = fm.fileExists(atPath: senseVoiceArchive.path)
+        let dirExists = fm.fileExists(atPath: senseVoiceDir.path)
+        let modelExists = fm.fileExists(atPath: senseVoiceCheckFile.path)
+
+        // Model is fully extracted — everything is fine.
+        if modelExists { return nil }
+
+        // Archive downloaded but neither extracted dir nor model exists.
+        // Extraction likely failed (disk space, permissions, corrupt download).
+        if archiveExists && !dirExists {
+            return """
+                Coli model extraction failed. The archive downloaded but could not be extracted. \
+                Try clearing the models cache: rm -rf ~/.coli/models/\
+                Then run: coli asr --help (to trigger a fresh model download). \
+                If GitHub is inaccessible in your network, enable TUN mode in your proxy.
+                """
+                .replacingOccurrences(of: "\n                ", with: " ")
         }
 
+        // Archive exists, dir exists, but model file is missing.
+        // Partial extraction — directory created but model.int8.onnx not written.
+        if archiveExists && dirExists && !modelExists {
+            return """
+                Coli model is partially extracted. Try clearing the models cache: \
+                rm -rf ~/.coli/models/\
+                Then run: coli asr --help (to trigger a fresh model download).
+                """
+                .replacingOccurrences(of: "\n                ", with: " ")
+        }
+
+        // No archive and no model. First-run model download hasn't happened yet
+        // (or was fully cleaned). Let coli handle it — not an error state.
         return nil
     }
 
@@ -2209,8 +2249,8 @@ final class OverlayPanelController {
                 x = frame.maxX - width - 16
                 y = frame.maxY - height - 16
             } else {
-                // Recording/transcription bar: center bottom, fixed width
-                x = frame.midX - 360 / 2
+                // Recording/transcription bar: center bottom
+                x = frame.midX - width / 2
                 y = frame.minY + 48
             }
 
@@ -2237,7 +2277,7 @@ final class OverlayPanelController {
 
     private func shouldCaptureKeyboard(for phase: AppPhase) -> Bool {
         switch phase {
-        case .recording, .transcribing:
+        case .transcribing, .done:
             true
         default:
             false
@@ -2316,35 +2356,72 @@ struct OverlayView: View {
                     .controlSize(.mini)
             }
 
-            // Text content — single line
-            let isError = {
-                if case .error = appState.phase { return true }
-                return false
-            }()
-
+            // Text content
             Group {
                 if case .done(let text) = appState.phase {
                     Text(text)
                         .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .truncationMode(.head)
                 } else if case .recording = appState.phase {
                     if appState.previewTranscript.isEmpty {
                         Text(L("Listening...", "聆听中..."))
                             .foregroundStyle(.white.opacity(0.35))
+                            .lineLimit(1)
+                            .truncationMode(.head)
                     } else {
                         Text(appState.previewTranscript)
                             .foregroundStyle(.white.opacity(0.9))
+                            .lineLimit(1)
+                            .truncationMode(.head)
                     }
                 } else if case .error = appState.phase {
                     Text(appState.phase.subtitle)
                         .foregroundStyle(.red.opacity(0.9))
+                        .font(.system(size: 12))
+                        .lineLimit(8)
+                        .fixedSize(horizontal: false, vertical: true)
                 } else {
                     Text(appState.phase.subtitle)
                         .foregroundStyle(.white.opacity(0.7))
+                        .lineLimit(1)
+                        .truncationMode(.head)
                 }
             }
-            .font(.system(size: isError ? 12 : 14))
-            .lineLimit(isError ? 3 : 1)
-            .truncationMode(isError ? .tail : .head)
+
+            // Text content
+            Group {
+                if case .done(let text) = appState.phase {
+                    Text(text)
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .truncationMode(.head)
+                } else if case .recording = appState.phase {
+                    if appState.previewTranscript.isEmpty {
+                        Text(L("Listening...", "聆听中..."))
+                            .foregroundStyle(.white.opacity(0.35))
+                            .lineLimit(1)
+                            .truncationMode(.head)
+                    } else {
+                        Text(appState.previewTranscript)
+                            .foregroundStyle(.white.opacity(0.9))
+                            .lineLimit(1)
+                            .truncationMode(.head)
+                    }
+                } else if case .error = appState.phase {
+                    Text(appState.phase.subtitle)
+                        .foregroundStyle(.red.opacity(0.9))
+                        .font(.system(size: 12))
+                        .lineLimit(8)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    Text(appState.phase.subtitle)
+                        .foregroundStyle(.white.opacity(0.7))
+                        .lineLimit(1)
+                        .truncationMode(.head)
+                }
+            }
+            .font(.system(size: 14))
 
             Spacer(minLength: 0)
 
@@ -2369,7 +2446,7 @@ struct OverlayView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .frame(width: isError ? 420 : 360)
+        .frame(minWidth: 360, maxWidth: 480)
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(Color(white: 0.15))

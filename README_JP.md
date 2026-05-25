@@ -102,6 +102,17 @@ scripts/build_app.sh
 | アップデート確認 | メニューバー → Check for Updates... |
 | 終了 | メニューバー → Quit（`⌘Q`） |
 
+## アンインストール
+
+1. メニューバーから TypeNo を終了
+2. `/Applications` から `TypeNo.app` をゴミ箱に移動
+3. Coli 音声エンジンとキャッシュされたモデルを削除：
+
+```bash
+rm -rf ~/.coli/
+npm uninstall -g @marswave/coli
+```
+
 ## 設計思想
 
 TypeNo がやることはひとつだけ：音声 → テキスト → ペースト。余計な UI なし、設定なし、構成不要。最速のタイピングは、タイピングしないこと。

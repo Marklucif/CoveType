@@ -1,13 +1,17 @@
 # Change log
 
-## v1.4.0 — 2026-03-28
+## v1.4.0 — 2026-05-25
 - **Streaming live preview**: while recording, TypeNo feeds live microphone PCM into `coli asr-stream` for about-once-per-second overlay text preview. Final paste still uses full-file `coli asr` pass.
 - **New overlay design**: dark solid background (not translucent), fixed 360pt width, rounded rectangle, breathing dot indicator. Replaces old capsule-shaped overlay.
+- **Overlay improvements**: error messages now wrap across multiple lines instead of truncating; panel width adapts dynamically (360–480pt) for long diagnostics.
+- **Recording fix**: wait for AVCaptureSession audio format to stabilize before starting recording, preventing intermittent empty recordings ("No speech detected") caused by 0 Hz AAC encoder initialization.
+- **Model download detection**: rewritten with three-state logic (not downloaded / downloaded-not-extracted / partial extraction) and clearer fix guidance suggesting to clear ~/.coli/models/.
+- **Focus fix**: overlay no longer steals keyboard focus during recording; only captures keyboard during transcription for Esc cancellation.
+- **Docs**: clarified that `npm install -g @marswave/coli` installs the CLI only (model downloads on first transcription); added Uninstall section to README (EN/CN/JP); updated troubleshooting to suggest clearing model cache.
 - **Bug fix**: second recording now correctly gets streaming preview (fixed `previewState` cleanup in `finishPreviewStream`).
 - **Bug fix**: overlay position no longer jumps between phases (fixed center positioning for compactView).
 - **Bug fix**: Swift concurrency errors in `captureOutput` audio data delegate (actor isolation fix with lock-protected dictionary).
 - **Code cleanup**: removed 2 unused imports, 3 dead methods, 5 dead properties, 1 dead callback. Reduced unnecessary `@Published` usage.
-- **Docs synced**: updated README (EN/CN/JP) to describe streaming preview feature.
 
 ## v1.3.1 — 2026-03-27
 - **Better error messages**: detect and surface actionable fixes for three common setup failures:

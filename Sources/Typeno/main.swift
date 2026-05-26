@@ -1497,6 +1497,28 @@ final class ColiASRService: @unchecked Sendable {
         return nil
     }
 
+    /// Cached login shell PATH resolved once on first use. GUI apps don't inherit
+    /// the user's terminal PATH, so we spawn a login shell to get the full PATH.
+    private static let resolvedShellPath: String? = {
+        let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: shell)
+        // Use login + interactive so .zshrc / .bashrc init scripts (nvm, homebrew, etc.) run
+        process.arguments = ["-l", "-i", "-c", "echo $PATH"]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+        do {
+            try process.run()
+            process.waitUntilExit()
+            guard process.terminationStatus == 0 else { return nil }
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            return String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        } catch {
+            return nil
+        }
+    }()
+
     private static func makeColiEnvironment(coliPath: String) -> [String: String] {
         var env = ProcessInfo.processInfo.environment
         let home = env["HOME"] ?? ""
@@ -1505,13 +1527,15 @@ final class ColiASRService: @unchecked Sendable {
             coliDir,
             "/opt/homebrew/bin",
             "/usr/local/bin",
-            home + "/.nvm/versions/node/",
             home + "/.bun/bin",
             home + "/.npm-global/bin",
             "/opt/homebrew/opt/node/bin"
         ]
+        // Prefer: explicit extra paths → resolved shell PATH → existing process PATH
+        let shellPath = resolvedShellPath ?? ""
         let existingPath = env["PATH"] ?? "/usr/bin:/bin"
-        env["PATH"] = (extraPaths + [existingPath]).joined(separator: ":")
+        let allPaths = extraPaths + (shellPath.isEmpty ? [existingPath] : [shellPath, existingPath])
+        env["PATH"] = allPaths.joined(separator: ":")
         env["NO_UPDATE_NOTIFIER"] = "1"
         env["npm_config_update_notifier"] = "false"
 
@@ -1679,7 +1703,12 @@ final class ColiASRService: @unchecked Sendable {
             }
         }
 
-        // GUI apps don't inherit terminal PATH, so spawn a login shell to resolve coli
+        // Check the cached login shell PATH (resolves nvm/fnm/volta without spawning a new shell each time)
+        if let shellPath = resolvedShellPath, let found = executableInPath(named: "coli", path: shellPath) {
+            return found
+        }
+
+        // Final fallback: spawn a login shell to resolve coli
         return resolveViaShell("coli")
     }
 

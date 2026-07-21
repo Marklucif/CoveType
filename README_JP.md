@@ -6,6 +6,8 @@
 
 **CoveType** は、プライバシーを重視した macOS 向けローカル AI 音声入力ツールです。ショートカットを押して話し、離すと Qwen3-ASR が Mac 上で文字起こしします。必要に応じて Qwen3.5 によるローカル整文、または Apple のオンデバイス翻訳を使用できます。
 
+![CoveType — Private AI voice typing for Mac](assets/covetype-github-hero.png)
+
 ## 主な機能
 
 - Qwen3-ASR 0.6B 8-bit によるローカル音声認識と30言語の自動検出

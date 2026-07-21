@@ -6,7 +6,7 @@
 
 **CoveType** 是一款主打隐私和本地 AI 的 macOS 语音输入工具，基于开源 TypeNo 项目二次开发。按住快捷键说话，松开后由本地 Qwen3-ASR 识别，可选本地润色或 Apple 设备端即时翻译，结果自动粘贴到原应用。
 
-![CoveType 宣传图](assets/hero.webp)
+![CoveType — Private AI voice typing for Mac](assets/covetype-github-hero.png)
 
 ## 当前功能
 

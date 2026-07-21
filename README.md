@@ -6,7 +6,7 @@
 
 **CoveType** is a privacy-first, local-AI voice-input app for macOS, derived from the open-source TypeNo project. Hold a shortcut to speak, release it to transcribe locally with Qwen3-ASR, optionally polish or translate on device, and paste the result back into the previous app.
 
-![CoveType hero image](assets/hero.webp)
+![CoveType — Private AI voice typing for Mac](assets/covetype-github-hero.png)
 
 ## Features
 

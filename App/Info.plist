@@ -31,7 +31,7 @@
 	<key>CoveTypeUpdateChannelIdentifier</key>
 	<string>covetype-local-ai-stable</string>
 	<key>CoveTypeUpdateManifestURL</key>
-	<string>https://marklucif.github.io/CoveType/update.json</string>
+	<string>https://covetype.com/update.json</string>
 	<key>CoveTypeFeedbackURL</key>
 	<string>https://github.com/Marklucif/CoveType/issues/new</string>
 </dict>

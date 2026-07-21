@@ -10,7 +10,7 @@ This maintenance release verifies the complete CoveType update path now that the
 
 ## Update path
 
-- Manifest: `https://marklucif.github.io/CoveType/update.json`
+- Manifest: `https://covetype.com/update.json`
 - Release: `https://github.com/Marklucif/CoveType/releases/tag/v2.1.4-beta.1`
 - Bundle identifier: `ai.covetype.app`
 - Channel: `covetype-local-ai-stable`

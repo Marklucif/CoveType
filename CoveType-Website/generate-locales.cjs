@@ -3,7 +3,7 @@ const path = require("node:path");
 const { supportedLanguages, locales, textKeys, localePaths } = require("./site.js");
 
 const root = __dirname;
-const baseUrl = "https://marklucif.github.io/CoveType/";
+const baseUrl = "https://covetype.com/";
 const templatePath = path.join(root, "index.html");
 const template = fs.readFileSync(templatePath, "utf8");
 const localeSettings = {

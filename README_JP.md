@@ -2,7 +2,7 @@
 
 [English](README.md) | [简体中文](README_CN.md)
 
-[製品サイト](https://marklucif.github.io/CoveType/) · [ダウンロード](https://github.com/Marklucif/CoveType/releases/tag/v2.1.4-beta.1) · [フィードバック](https://github.com/Marklucif/CoveType/issues/new) · [上流プロジェクト](https://github.com/marswaveai/TypeNo)
+[製品サイト](https://covetype.com/) · [ダウンロード](https://github.com/Marklucif/CoveType/releases/tag/v2.1.4-beta.1) · [フィードバック](https://github.com/Marklucif/CoveType/issues/new) · [上流プロジェクト](https://github.com/marswaveai/TypeNo)
 
 **CoveType** は、プライバシーを重視した macOS 向けローカル AI 音声入力ツールです。ショートカットを押して話し、離すと Qwen3-ASR が Mac 上で文字起こしします。必要に応じて Qwen3.5 によるローカル整文、または Apple のオンデバイス翻訳を使用できます。
 

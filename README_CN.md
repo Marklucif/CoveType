@@ -2,7 +2,7 @@
 
 [English](README.md) | [Windows 方案](docs/WINDOWS.md)
 
-[产品网站](https://marklucif.github.io/CoveType/) · [下载安装](https://github.com/Marklucif/CoveType/releases/tag/v2.1.4-beta.1) · [使用反馈](https://github.com/Marklucif/CoveType/issues/new) · [上游项目](https://github.com/marswaveai/TypeNo)
+[产品网站](https://covetype.com/) · [下载安装](https://github.com/Marklucif/CoveType/releases/tag/v2.1.4-beta.1) · [使用反馈](https://github.com/Marklucif/CoveType/issues/new) · [上游项目](https://github.com/marswaveai/TypeNo)
 
 **CoveType** 是一款主打隐私和本地 AI 的 macOS 语音输入工具，基于开源 TypeNo 项目二次开发。按住快捷键说话，松开后由本地 Qwen3-ASR 识别，可选本地润色或 Apple 设备端即时翻译，结果自动粘贴到原应用。
 

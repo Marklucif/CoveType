@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://marklucif.github.io/CoveType/sitemap.xml
+Sitemap: https://covetype.com/sitemap.xml

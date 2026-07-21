@@ -2,7 +2,7 @@
 
 [中文](README_CN.md) | [Windows plan](docs/WINDOWS.md)
 
-[Website](https://marklucif.github.io/CoveType/) · [Download](https://github.com/Marklucif/CoveType/releases/tag/v2.1.4-beta.1) · [Feedback](https://github.com/Marklucif/CoveType/issues/new) · [Upstream](https://github.com/marswaveai/TypeNo)
+[Website](https://covetype.com/) · [Download](https://github.com/Marklucif/CoveType/releases/tag/v2.1.4-beta.1) · [Feedback](https://github.com/Marklucif/CoveType/issues/new) · [Upstream](https://github.com/marswaveai/TypeNo)
 
 **CoveType** is a privacy-first, local-AI voice-input app for macOS, derived from the open-source TypeNo project. Hold a shortcut to speak, release it to transcribe locally with Qwen3-ASR, optionally polish or translate on device, and paste the result back into the previous app.
 

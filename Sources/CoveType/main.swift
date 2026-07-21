@@ -495,8 +495,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func handleHotkeyPress() {
-        guard case .idle = appState.phase else { return }
-        startRecording()
+        switch appState.phase {
+        case .idle:
+            startRecording()
+        case .transcribing, .error:
+            // A fresh push-to-talk gesture always wins. This prevents a slow
+            // model request or a dismissed error from making the shortcut
+            // appear unresponsive on the next attempt.
+            appState.cancel()
+            startRecording()
+        case .recording, .done, .permissions, .missingColi, .installingColi, .updating:
+            break
+        }
     }
 
     private func handleHotkeyRelease() {
@@ -538,7 +548,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 try await appState.stopRecording()
                 await appState.transcribeAndInsert()
             } catch is CancellationError {
-                // User canceled; keep app in reset state
+                appState.cancel()
             } catch {
                 appState.showError(error.localizedDescription)
             }
@@ -683,6 +693,10 @@ final class AppState: ObservableObject {
         transcript = ""
         microphoneLevel = 0
         previousApp = NSWorkspace.shared.frontmostApplication
+        recordingElapsedSeconds = 0
+        phase = .recording
+        onOverlayRequest?(true)
+
         let microphone = try MicrophoneManager.resolvedDevice(for: UserDefaults.standard.microphoneSelection)
         currentRecordingURL = try recorder.start(using: microphone) { [weak self] level in
             Task { @MainActor in
@@ -690,12 +704,9 @@ final class AppState: ObservableObject {
             }
         }
         beginLocalAIPrewarmIfNeeded()
-        recordingElapsedSeconds = 0
         recordingTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.recordingElapsedSeconds += 1 }
         }
-        phase = .recording
-        onOverlayRequest?(true)
     }
 
     func stopRecording() async throws {
@@ -1183,6 +1194,9 @@ final class AudioRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, AVCap
         let audioDataQueue = DispatchQueue(label: "ai.covetype.app.recorder.audio-data")
         var stopContinuation: CheckedContinuation<URL, Error>?
         var discardRecordingOnFinish = false
+        var hasStartedRecording = false
+        var stopRequested = false
+        var stopIssued = false
         var lastLevelEmissionTime: TimeInterval = 0
 
         init(
@@ -1239,6 +1253,24 @@ final class AudioRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, AVCap
                 && FileManager.default.fileExists(atPath: abandonedWAV.path) == false
                 && FileManager.default.fileExists(atPath: unrelatedFile.path)
         } catch {
+            return false
+        }
+    }
+
+    static func runStopBeforeStartSelfTest() async -> Bool {
+        let recorder = AudioRecorder()
+        do {
+            let microphone = try MicrophoneManager.resolvedDevice(for: .automatic)
+            let startedURL = try recorder.start(using: microphone)
+            let stoppedURL = try await recorder.stop()
+            defer { try? FileManager.default.removeItem(at: stoppedURL) }
+            guard startedURL == stoppedURL,
+                  let attributes = try? FileManager.default.attributesOfItem(atPath: stoppedURL.path),
+                  let byteCount = attributes[.size] as? NSNumber else { return false }
+            return byteCount.intValue > 44
+        } catch {
+            recorder.cancel()
+            print("RECORDING_RACE_SELF_TEST_ERROR=\(error.localizedDescription)")
             return false
         }
     }
@@ -1340,16 +1372,11 @@ final class AudioRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, AVCap
               let context = activeContexts[contextID] else {
             throw CoveTypeError.noRecording
         }
-        guard context.output.isRecording else {
-            tearDownCapturePipeline(for: context)
-            activeContexts.removeValue(forKey: contextID)
-            currentRecordingID = nil
-            return context.recordingURL
-        }
+        guard context.stopContinuation == nil else { throw CancellationError() }
 
         return try await withCheckedThrowingContinuation { continuation in
             context.stopContinuation = continuation
-            context.output.stopRecording()
+            requestStop(for: contextID, context: context)
         }
     }
 
@@ -1362,17 +1389,18 @@ final class AudioRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, AVCap
         currentRecordingID = nil
         finishStop(for: contextID, with: .failure(CancellationError()))
 
-        let wasRecording = context.output.isRecording
         context.discardRecordingOnFinish = true
-        context.output.stopRecording()
-        if !wasRecording {
-            tearDownCapturePipeline(for: context)
-            try? FileManager.default.removeItem(at: context.recordingURL)
-            activeContexts.removeValue(forKey: contextID)
-        }
+        requestStop(for: contextID, context: context)
     }
 
-    nonisolated func fileOutput(_ output: AVCaptureFileOutput, didStartRecordingTo fileURL: URL, from connections: [AVCaptureConnection]) {}
+    nonisolated func fileOutput(_ output: AVCaptureFileOutput, didStartRecordingTo fileURL: URL, from connections: [AVCaptureConnection]) {
+        let contextID = ObjectIdentifier(output)
+        Task { @MainActor in
+            guard let context = activeContexts[contextID] else { return }
+            context.hasStartedRecording = true
+            requestStopIfReady(context: context)
+        }
+    }
 
     nonisolated func fileOutput(_ output: AVCaptureFileOutput, didFinishRecordingTo outputFileURL: URL, from connections: [AVCaptureConnection], error: (any Error)?) {
         let contextID = ObjectIdentifier(output)
@@ -1426,6 +1454,42 @@ final class AudioRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, AVCap
         }
         context.session.inputs.forEach { context.session.removeInput($0) }
         context.session.outputs.forEach { context.session.removeOutput($0) }
+    }
+
+    private func requestStop(for contextID: ObjectIdentifier, context: RecordingContext) {
+        context.stopRequested = true
+        requestStopIfReady(context: context)
+
+        // AVCaptureAudioFileOutput starts asynchronously. If the shortcut is
+        // released immediately after the hold threshold, wait for didStart and
+        // stop there instead of tearing down a session that is still starting.
+        // The old behavior could orphan a live microphone recording and make
+        // the next attempt report "No Recording".
+        if context.hasStartedRecording == false {
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .seconds(3))
+                guard let self,
+                      self.activeContexts[contextID] === context,
+                      context.hasStartedRecording == false,
+                      context.stopRequested else { return }
+                self.finishStop(for: contextID, with: .failure(CoveTypeError.couldNotStartRecording))
+                context.discardRecordingOnFinish = true
+                self.tearDownCapturePipeline(for: context)
+                try? FileManager.default.removeItem(at: context.recordingURL)
+                self.activeContexts.removeValue(forKey: contextID)
+                if self.currentRecordingID == contextID {
+                    self.currentRecordingID = nil
+                }
+            }
+        }
+    }
+
+    private func requestStopIfReady(context: RecordingContext) {
+        guard context.stopRequested,
+              context.stopIssued == false,
+              context.hasStartedRecording || context.output.isRecording else { return }
+        context.stopIssued = true
+        context.output.stopRecording()
     }
 
     private func finishStop(for contextID: ObjectIdentifier, with result: Result<URL, Error>) {
@@ -2697,9 +2761,43 @@ final class HotkeyMonitor {
         )
 
         let customExpected = ["press", "release"]
-        let passed = events == expected && customEvents == customExpected
+        var modifierRecoveryEvents: [String] = []
+        let commandBinding = CustomShortcutBinding(
+            keyCode: 55,
+            modifierFlagsRaw: NSEvent.ModifierFlags.command.rawValue,
+            modifierOnly: true,
+            displayName: "⌘ Command"
+        )
+        let modifierRecoveryMonitor = HotkeyMonitor(
+            onToggle: { modifierRecoveryEvents.append("toggle") },
+            onPress: { modifierRecoveryEvents.append("press") },
+            onRelease: { modifierRecoveryEvents.append("release") },
+            customBinding: commandBinding,
+            holdDuration: 0.10,
+            loadStoredShortcut: false
+        )
+        modifierRecoveryMonitor.handleFlagsChanged(
+            keyEvent(type: .flagsChanged, keyCode: 55, flags: .command)
+        )
+        try? await Task.sleep(for: .milliseconds(140))
+        // Simulate macOS dropping the release event, then delivering the next
+        // physical Command press. The monitor must end the stale gesture and
+        // arm the new one instead of remaining stuck forever.
+        modifierRecoveryMonitor.handleFlagsChanged(
+            keyEvent(type: .flagsChanged, keyCode: 55, flags: .command)
+        )
+        try? await Task.sleep(for: .milliseconds(140))
+        modifierRecoveryMonitor.handleFlagsChanged(
+            keyEvent(type: .flagsChanged, keyCode: 55, flags: [])
+        )
+
+        let modifierRecoveryExpected = ["press", "release", "press", "release"]
+        let passed = events == expected
+            && customEvents == customExpected
+            && modifierRecoveryEvents == modifierRecoveryExpected
         print("HOTKEY_SELF_TEST_EVENTS=\(events.joined(separator: ","))")
         print("CUSTOM_HOTKEY_SELF_TEST_EVENTS=\(customEvents.joined(separator: ","))")
+        print("MODIFIER_RECOVERY_SELF_TEST_EVENTS=\(modifierRecoveryEvents.joined(separator: ","))")
         print("HOTKEY_SELF_TEST_RESULT=\(passed ? "PASS" : "FAIL")")
         return passed
     }
@@ -2832,6 +2930,15 @@ final class HotkeyMonitor {
 
         if binding.modifierOnly {
             if event.keyCode == binding.keyCode, currentFlags == expectedFlags, !expectedFlags.isEmpty {
+                if customPrimaryIsDown {
+                    // A second press with no observed release means the global
+                    // event monitor lost the previous key-up. Recover the stale
+                    // state before arming this physical press.
+                    cancelPendingHold()
+                    if activeHoldKey == .custom {
+                        finishActiveHold()
+                    }
+                }
                 customPrimaryIsDown = true
                 armHold(for: .custom, flags: event.modifierFlags)
             } else if customPrimaryIsDown, currentFlags != expectedFlags {
@@ -4459,6 +4566,7 @@ final class OverlayPanelController {
         } else {
             activePanel.orderFrontRegardless()
         }
+        activePanel.displayIfNeeded()
         inactivePanel.orderOut(nil)
     }
 
@@ -5046,6 +5154,13 @@ if let diagnosticIndex = CommandLine.arguments.firstIndex(of: "--keyboard-diagno
     let passed = AudioRecorder.runAudioPipelineSelfTest()
     print("AUDIO_PIPELINE_SELF_TEST_RESULT=\(passed ? "PASS" : "FAIL")")
     exit(passed ? EXIT_SUCCESS : EXIT_FAILURE)
+} else if CommandLine.arguments.contains("--recording-race-self-test") {
+    Task { @MainActor in
+        let passed = await AudioRecorder.runStopBeforeStartSelfTest()
+        print("RECORDING_RACE_SELF_TEST_RESULT=\(passed ? "PASS" : "FAIL")")
+        exit(passed ? EXIT_SUCCESS : EXIT_FAILURE)
+    }
+    RunLoop.main.run()
 } else if let previewIndex = CommandLine.arguments.firstIndex(of: "--render-status-lamp-preview"),
           let previewPath = CommandLine.arguments[safe: previewIndex + 1] {
     Task { @MainActor in

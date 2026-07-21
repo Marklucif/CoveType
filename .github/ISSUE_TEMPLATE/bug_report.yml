@@ -27,7 +27,7 @@ body:
     id: version
     attributes:
       label: CoveType version
-      placeholder: 2.1.6
+      placeholder: 2.1.7
     validations:
       required: true
   - type: input

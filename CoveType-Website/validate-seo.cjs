@@ -63,7 +63,7 @@ for (const [relativePath] of pages) {
   if (!html.includes('class="telemetry-disclosure"')) {
     throw new Error(`${relativePath}: telemetry disclosure missing`);
   }
-  if (/v2\.1\.4-beta\.1|CoveType-2\.1\.4-macOS/.test(html)) {
+  if (/v2\.1\.[45]-beta\.1|CoveType-2\.1\.[45]-macOS/.test(html)) {
     throw new Error(`${relativePath}: outdated download link found`);
   }
 }

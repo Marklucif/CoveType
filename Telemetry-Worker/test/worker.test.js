@@ -5,7 +5,7 @@ import { hashInstallID, normalizeCountry, validatePayload } from "../src/index.j
 const validPayload = {
   schema_version: 1,
   installation_id: "3f25a943-88cd-4e9f-8d63-2a5aa713ad53",
-  app_version: "2.1.5",
+  app_version: "2.1.6",
   macos_version: "15.5",
   architecture: "arm64"
 };

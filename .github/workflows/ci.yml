@@ -18,6 +18,8 @@ jobs:
         run: swift build -c release
       - name: Verify anonymous usage telemetry policy
         run: .build/release/CoveType --telemetry-self-test
+      - name: Verify WAV audio pipeline
+        run: .build/release/CoveType --audio-pipeline-self-test
 
   telemetry-worker:
     runs-on: ubuntu-latest

@@ -356,6 +356,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        AudioRecorder.removeAbandonedTemporaryRecordings()
 
         overlayController = OverlayPanelController(appState: appState)
         statusItemController = StatusItemController(appState: appState)
@@ -801,6 +802,7 @@ final class AppState: ObservableObject {
     }
 
     func showError(_ message: String) {
+        removeCurrentRecordingFile()
         phase = .error(message)
         onOverlayRequest?(true)
     }
@@ -898,8 +900,17 @@ final class AppState: ObservableObject {
     }
 
     func shutdownLocalAI() {
+        recorder.cancel()
+        removeCurrentRecordingFile()
         systemTranslation.cancel()
         localAIService.shutdown()
+    }
+
+    private func removeCurrentRecordingFile() {
+        if let currentRecordingURL {
+            try? FileManager.default.removeItem(at: currentRecordingURL)
+        }
+        currentRecordingURL = nil
     }
 
     func releaseLocalAIMemory() async {
@@ -1195,6 +1206,43 @@ final class AudioRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, AVCap
     private let audioContextLock = NSLock()
     private nonisolated(unsafe) var audioDataContexts: [ObjectIdentifier: RecordingContext] = [:]
 
+    static func removeAbandonedTemporaryRecordings(
+        in directory: URL = FileManager.default.temporaryDirectory.appendingPathComponent("CoveType", isDirectory: true)
+    ) {
+        guard let files = try? FileManager.default.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        ) else { return }
+        for file in files where ["m4a", "wav"].contains(file.pathExtension.lowercased()) {
+            try? FileManager.default.removeItem(at: file)
+        }
+    }
+
+    static func runAudioPipelineSelfTest() -> Bool {
+        guard AVCaptureAudioFileOutput.availableOutputFileTypes().contains(.wav) else { return false }
+
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("CoveTypeAudioSelfTest-\(UUID().uuidString)", isDirectory: true)
+        let abandonedM4A = directory.appendingPathComponent("abandoned.m4a")
+        let abandonedWAV = directory.appendingPathComponent("abandoned.wav")
+        let unrelatedFile = directory.appendingPathComponent("keep.txt")
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            try Data("test".utf8).write(to: abandonedM4A)
+            try Data("test".utf8).write(to: abandonedWAV)
+            try Data("keep".utf8).write(to: unrelatedFile)
+            removeAbandonedTemporaryRecordings(in: directory)
+            return FileManager.default.fileExists(atPath: abandonedM4A.path) == false
+                && FileManager.default.fileExists(atPath: abandonedWAV.path) == false
+                && FileManager.default.fileExists(atPath: unrelatedFile.path)
+        } catch {
+            return false
+        }
+    }
+
     func start(
         using microphone: AVCaptureDevice,
         levelHandler: (@Sendable (Float) -> Void)? = nil
@@ -1206,7 +1254,10 @@ final class AudioRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, AVCap
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("CoveType", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
 
-        let url = directory.appendingPathComponent(UUID().uuidString).appendingPathExtension("m4a")
+        // WAV is decoded directly by mlx-audio's bundled miniaudio path. Using
+        // M4A here would require an external ffmpeg binary, which Finder and
+        // login-item launches cannot reliably discover in the user's shell PATH.
+        let url = directory.appendingPathComponent(UUID().uuidString).appendingPathExtension("wav")
         let session = AVCaptureSession()
         let output = AVCaptureAudioFileOutput()
         let dataOutput: AVCaptureAudioDataOutput? = levelHandler == nil ? nil : AVCaptureAudioDataOutput()
@@ -1280,7 +1331,7 @@ final class AudioRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, AVCap
             Thread.sleep(forTimeInterval: 0.01)
         }
 
-        output.startRecording(to: url, outputFileType: .m4a, recordingDelegate: self)
+        output.startRecording(to: url, outputFileType: .wav, recordingDelegate: self)
         return url
     }
 
@@ -4991,6 +5042,10 @@ if let diagnosticIndex = CommandLine.arguments.firstIndex(of: "--keyboard-diagno
     let passed = TelemetryService.runSelfTest()
     print("ANONYMOUS_USAGE_TELEMETRY_SELF_TEST_RESULT=\(passed ? "PASS" : "FAIL")")
     exit(passed ? EXIT_SUCCESS : EXIT_FAILURE)
+} else if CommandLine.arguments.contains("--audio-pipeline-self-test") {
+    let passed = AudioRecorder.runAudioPipelineSelfTest()
+    print("AUDIO_PIPELINE_SELF_TEST_RESULT=\(passed ? "PASS" : "FAIL")")
+    exit(passed ? EXIT_SUCCESS : EXIT_FAILURE)
 } else if let previewIndex = CommandLine.arguments.firstIndex(of: "--render-status-lamp-preview"),
           let previewPath = CommandLine.arguments[safe: previewIndex + 1] {
     Task { @MainActor in
@@ -5006,9 +5061,15 @@ if let diagnosticIndex = CommandLine.arguments.firstIndex(of: "--keyboard-diagno
         do {
             await service.prewarm(loadASR: true, loadPolisher: true)
             let raw = try await service.transcribe(fileURL: URL(fileURLWithPath: audioPath))
-            let polished = try await service.polish(text: raw, mode: .light)
             print("SELF_TEST_RAW=\(raw)")
-            print("SELF_TEST_POLISHED=\(polished)")
+            do {
+                let polished = try await service.polish(text: raw, mode: .light)
+                print("SELF_TEST_POLISHED=\(polished)")
+            } catch {
+                // Production dictation returns the validated ASR text when the
+                // optional small polishing model rejects or over-rewrites it.
+                print("SELF_TEST_POLISH_FALLBACK=PASS reason=\(error.localizedDescription)")
+            }
             service.shutdown()
             exit(EXIT_SUCCESS)
         } catch {

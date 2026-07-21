@@ -557,6 +557,7 @@ log "Running runtime and shortcut checks"
 "$INSTALL_APP/Contents/MacOS/$APP_EXECUTABLE" --hotkey-self-test
 "$INSTALL_APP/Contents/MacOS/$APP_EXECUTABLE" --update-channel-self-test
 "$INSTALL_APP/Contents/MacOS/$APP_EXECUTABLE" --telemetry-self-test
+"$INSTALL_APP/Contents/MacOS/$APP_EXECUTABLE" --audio-pipeline-self-test
 
 HEALTH_OUTPUT="$(printf '%s\n' \
     '{"id":"health","action":"health"}' \

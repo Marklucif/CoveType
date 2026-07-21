@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://marklucif.github.io/CoveType/sitemap.xml

@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="zh-Hans" data-locale="zh-Hans" data-root="..">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#07110f" />
+    <title>CoveType — Mac 本地 AI 语音输入与语音转文字</title>
+    <meta
+      name="description"
+      content="免费开源的 Mac AI 语音输入工具。本地 Qwen 语音转文字与 AI 润色，自动识别 30 种语言，支持 Apple 设备端翻译。"
+    />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="author" content="CoveType contributors" />
+    <link rel="canonical" href="https://marklucif.github.io/CoveType/zh-cn/" />
+    <link rel="alternate" hreflang="en" href="https://marklucif.github.io/CoveType/" />
+    <link rel="alternate" hreflang="zh-Hans" href="https://marklucif.github.io/CoveType/zh-cn/" />
+    <link rel="alternate" hreflang="zh-Hant" href="https://marklucif.github.io/CoveType/zh-tw/" />
+    <link rel="alternate" hreflang="ja" href="https://marklucif.github.io/CoveType/ja/" />
+    <link rel="alternate" hreflang="ko" href="https://marklucif.github.io/CoveType/ko/" />
+    <link rel="alternate" hreflang="fr" href="https://marklucif.github.io/CoveType/fr/" />
+    <link rel="alternate" hreflang="de" href="https://marklucif.github.io/CoveType/de/" />
+    <link rel="alternate" hreflang="es" href="https://marklucif.github.io/CoveType/es/" />
+    <link rel="alternate" hreflang="x-default" href="https://marklucif.github.io/CoveType/" />
+    <meta property="og:site_name" content="CoveType" />
+    <meta property="og:title" content="CoveType — Mac 本地 AI 语音输入与语音转文字" />
+    <meta
+      property="og:description"
+      content="免费开源的 Mac AI 语音输入工具。本地 Qwen 语音转文字与 AI 润色，自动识别 30 种语言，支持 Apple 设备端翻译。"
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://marklucif.github.io/CoveType/zh-cn/" />
+    <meta property="og:locale" content="zh_CN" />
+    <meta property="og:image" content="https://marklucif.github.io/CoveType/assets/covetype-social-card-seo.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="CoveType — Mac 本地 AI 语音输入与语音转文字" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="CoveType — Mac 本地 AI 语音输入与语音转文字" />
+    <meta name="twitter:description" content="免费开源的 Mac AI 语音输入工具。本地 Qwen 语音转文字与 AI 润色，自动识别 30 种语言，支持 Apple 设备端翻译。" />
+    <meta name="twitter:image" content="https://marklucif.github.io/CoveType/assets/covetype-social-card-seo.png" />
+    <meta name="twitter:image:alt" content="CoveType — Mac 本地 AI 语音输入与语音转文字" />
+    <link rel="icon" href="../assets/covetype-icon.png" sizes="512x512" />
+    <link rel="apple-touch-icon" href="../assets/covetype-icon.png" />
+    <link rel="sitemap" type="application/xml" href="https://marklucif.github.io/CoveType/sitemap.xml" />
+    <link rel="stylesheet" href="../styles.css" />
+    <script src="../site.js" defer></script>
+    <script type="application/ld+json" id="structured-data">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "https://marklucif.github.io/CoveType/#website",
+            "url": "https://marklucif.github.io/CoveType/",
+            "name": "CoveType",
+            "description": "免费开源的 Mac AI 语音输入工具。本地 Qwen 语音转文字与 AI 润色，自动识别 30 种语言，支持 Apple 设备端翻译。",
+            "inLanguage": "zh-Hans"
+          },
+          {
+            "@type": "SoftwareApplication",
+            "@id": "https://marklucif.github.io/CoveType/#app",
+            "name": "CoveType",
+            "url": "https://marklucif.github.io/CoveType/",
+            "downloadUrl": "https://github.com/Marklucif/CoveType/releases/download/v2.1.4-beta.1/CoveType-2.1.4-macOS-AppleSilicon-Installer.zip",
+            "softwareVersion": "2.1.4",
+            "operatingSystem": "macOS 15 or later on Apple silicon",
+            "applicationCategory": "UtilitiesApplication",
+            "description": "免费开源的 Mac AI 语音输入工具。本地 Qwen 语音转文字与 AI 润色，自动识别 30 种语言，支持 Apple 设备端翻译。",
+            "image": "https://marklucif.github.io/CoveType/assets/covetype-icon.png",
+            "screenshot": "https://marklucif.github.io/CoveType/assets/status-lamps.png",
+            "license": "https://www.gnu.org/licenses/gpl-3.0.html",
+            "codeRepository": "https://github.com/Marklucif/CoveType",
+            "featureList": [
+              "本地语音识别",
+              "本地 AI 润色",
+              "即时翻译",
+              "自定义按住说话",
+              "跨应用输入",
+              "菜单栏常驻"
+            ],
+            "offers": {
+              "@type": "Offer",
+              "price": "0",
+              "priceCurrency": "USD",
+              "availability": "https://schema.org/InStock"
+            }
+          }
+        ]
+      }
+    </script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="#top" aria-label="CoveType home">
+        <span class="brand-lamp" aria-hidden="true"></span>
+        <span>CoveType</span>
+      </a>
+      <nav aria-label="Primary navigation">
+        <a href="#features" data-i18n="navFeatures">功能</a>
+        <a href="#why-covetype" data-i18n="navWhy">为什么选择</a>
+        <a href="#privacy" data-i18n="navPrivacy">隐私</a>
+        <a href="#languages" data-i18n="navLanguages">语言</a>
+        <a href="#open-source" data-i18n="navOpenSource">开源</a>
+        <a href="#install" data-i18n="navInstall">安装</a>
+        <a href="https://github.com/Marklucif/CoveType">GitHub</a>
+      </nav>
+      <div class="top-actions">
+        <label class="visually-hidden" for="locale" data-i18n="languageSelector">网站语言</label>
+        <select id="locale" aria-label="Website language">
+          <option value="en">English</option>
+          <option value="zh-Hans">简体中文</option>
+          <option value="zh-Hant">繁體中文</option>
+          <option value="ja">日本語</option>
+          <option value="ko">한국어</option>
+          <option value="fr">Français</option>
+          <option value="de">Deutsch</option>
+          <option value="es">Español</option>
+        </select>
+        <a class="small-download" href="https://github.com/Marklucif/CoveType/releases/download/v2.1.4-beta.1/CoveType-2.1.4-macOS-AppleSilicon-Installer.zip" data-i18n="downloadShort">下载</a>
+      </div>
+    </header>
+
+    <main id="top">
+      <section class="hero wrap">
+        <div class="hero-copy">
+          <p class="eyebrow" data-i18n="eyebrow">隐私 · 本地 · AI</p>
+          <h1 data-i18n="heroTitle">Mac 本地 AI 语音输入。你的声音只留在本机。</h1>
+          <p class="hero-text" data-i18n="heroText">按住快捷键说话，松开即可在任意应用输入。CoveType 在本地运行 Qwen 语音转文字与 AI 润色，自动识别 30 种语言，并支持 Apple 设备端翻译。</p>
+          <div class="hero-actions">
+            <a class="button primary" href="https://github.com/Marklucif/CoveType/releases/download/v2.1.4-beta.1/CoveType-2.1.4-macOS-AppleSilicon-Installer.zip">
+              <span data-i18n="downloadMac">下载 macOS 版</span>
+              <small>v2.1.4 · Apple Silicon</small>
+            </a>
+            <a class="button secondary" href="#privacy" data-i18n="readPrivacy">查看隐私说明</a>
+          </div>
+          <ul class="quick-facts" aria-label="Product requirements">
+            <li>macOS 15+</li>
+            <li data-i18n="appleSilicon">Apple 芯片（M1+）</li>
+            <li data-i18n="noAccount">无需账号</li>
+            <li data-i18n="freeOpenSource">免费开源</li>
+          </ul>
+        </div>
+        <div class="hero-card" aria-label="CoveType listening status">
+          <img src="../assets/covetype-icon.png" alt="CoveType" width="112" height="112" />
+          <span class="live-line"><i></i><b data-i18n="listening">正在聆听</b></span>
+          <p data-i18n="releaseToType">松开后识别并输入</p>
+          <div class="local-chip" data-i18n="processedLocally">本地处理</div>
+        </div>
+      </section>
+
+      <section class="section wrap" id="why-covetype">
+        <p class="eyebrow" data-i18n="painEyebrow">解决真实问题</p>
+        <h2 data-i18n="painTitle">摆脱云端 AI 语音输入的隐私与工作流负担。</h2>
+        <p class="section-intro narrow" data-i18n="painIntro">云端语音输入可能暴露敏感内容、增加网络延迟、输出凌乱文字，并与常用快捷键冲突。CoveType 针对这些痛点设计。</p>
+        <div class="pain-grid" id="painGrid">
+          <!-- GENERATED:painGrid:START -->
+          <article><span>01</span><h3>担心语音隐私？</h3><p>语音识别和 AI 润色都在 Mac 本地运行，日常口述不会发送到云端转录服务。</p></article>
+          <article><span>02</span><h3>不想等待云端返回？</h3><p>本地模型省去远程 ASR 和写作 API 往返，离线时仍可使用。</p></article>
+          <article><span>03</span><h3>原始转录太凌乱？</h3><p>可选本地 Qwen 模型会在输入前改善标点、断句和口语表达。</p></article>
+          <article><span>04</span><h3>快捷键经常误触？</h3><p>可录制单键或组合键并设置按住延迟，确保 Control-C 等常用快捷键正常工作。</p></article>
+<!-- GENERATED:painGrid:END -->
+        </div>
+        <div class="comparison-wrap">
+          <h3 data-i18n="comparisonTitle">CoveType 与常见云端 AI 语音输入对比</h3>
+          <div class="comparison-scroll">
+            <table>
+              <thead><tr><th data-i18n="comparisonCapability">能力</th><th>CoveType</th><th data-i18n="comparisonCloud">常见云端语音输入</th></tr></thead>
+              <tbody id="comparisonRows">
+                <!-- GENERATED:comparisonRows:START -->
+                <tr><th>语音转文字</th><td>在 Mac 本地运行</td><td>上传音频后处理</td></tr>
+                <tr><th>AI 文字润色</th><td>本地 Qwen 模型</td><td>通常由云端大模型处理</td></tr>
+                <tr><th>翻译</th><td>Apple 设备端框架</td><td>通常调用远程翻译 API</td></tr>
+                <tr><th>账号</th><td>不需要</td><td>通常需要</td></tr>
+                <tr><th>源代码</th><td>GPLv3 开源</td><td>通常闭源</td></tr>
+<!-- GENERATED:comparisonRows:END -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="section wrap" id="features">
+        <p class="eyebrow" data-i18n="featuresEyebrow">核心功能</p>
+        <h2 data-i18n="featuresTitle">不绕云端的语音输入。</h2>
+        <div class="card-grid" id="featureGrid">
+          <!-- GENERATED:featureGrid:START -->
+          <article class="card"><span>01</span><h3>本地语音识别</h3><p>Qwen3-ASR 0.6B 8-bit 在 Apple 芯片上运行，并自动检测 30 种语言。</p></article>
+          <article class="card"><span>02</span><h3>本地 AI 润色</h3><p>Qwen3.5 0.8B 4-bit 可整理标点、断句和口语表达，不调用云端写作 API。</p></article>
+          <article class="card"><span>03</span><h3>即时翻译</h3><p>说一种语言，通过 Apple Translation 与已下载的设备端语言包输出另一种语言。</p></article>
+          <article class="card"><span>04</span><h3>自定义按住说话</h3><p>录制单键或组合键并设置按住时长，避免常用快捷键误触录音。</p></article>
+          <article class="card"><span>05</span><h3>跨应用输入</h3><p>松开快捷键后，CoveType 将结果插入当前应用的光标位置。</p></article>
+          <article class="card"><span>06</span><h3>菜单栏常驻</h3><p>小型呼吸灯显示空闲、聆听、处理和完成状态，并可登录后自动启动。</p></article>
+<!-- GENERATED:featureGrid:END -->
+        </div>
+      </section>
+
+      <section class="section privacy-section" id="privacy">
+        <div class="wrap two-column">
+          <div>
+            <p class="eyebrow" data-i18n="privacyEyebrow">隐私与安全</p>
+            <h2 data-i18n="privacyTitle">看得懂的本地处理路径。</h2>
+            <p class="section-intro" data-i18n="privacyIntro">日常转录与 AI 润色不调用云端语音识别或云端写作 API。只有主动按住已配置快捷键后才开始录音。</p>
+          </div>
+          <div class="plain-list" id="privacyList">
+            <!-- GENERATED:privacyList:START -->
+            <div><b>音频留在本地</b><p>临时录音在 Mac 上处理，流程结束后清理。</p></div>
+            <div><b>模型留在本地</b><p>Qwen3-ASR 与 Qwen3.5 保存在 CoveType 的本地应用数据中。</p></div>
+            <div><b>无需账号与同步</b><p>CoveType 不要求登录，也不会同步转录历史。</p></div>
+            <div><b>权限用途有限</b><p>麦克风用于采集语音；辅助功能用于全局快捷键和向当前应用输入文字。</p></div>
+<!-- GENERATED:privacyList:END -->
+          </div>
+        </div>
+        <div class="wrap boundary-note">
+          <b data-i18n="networkTitle">什么时候会联网？</b>
+          <p data-i18n="networkText">首次安装会下载固定版本的运行环境和模型；macOS 会按需下载 Apple Translation 语言包；配置更新通道后，更新检查可能访问发布地址。日常识别与润色仍在本地完成。</p>
+        </div>
+        <div class="wrap local-flow-wrap">
+          <h3 data-i18n="flowTitle">你的本地语音转文字路径</h3>
+          <ol class="local-flow" id="localFlow">
+            <!-- GENERATED:localFlow:START -->
+            <li><span>1</span><b>说话</b><small>只有按住所选快捷键时才开始录音。</small></li>
+            <li><span>2</span><b>本地转录</b><small>Qwen3-ASR 在 Mac 上把语音转换为文字。</small></li>
+            <li><span>3</span><b>本地润色</b><small>可选 Qwen3.5 在设备端改善可读性。</small></li>
+            <li><span>4</span><b>翻译或输入</b><small>通过 Apple 设备端翻译，或把结果插入当前应用。</small></li>
+<!-- GENERATED:localFlow:END -->
+          </ol>
+        </div>
+      </section>
+
+      <section class="section wrap open-source-section" id="open-source">
+        <div>
+          <p class="eyebrow" data-i18n="openEyebrow">为开源而设计</p>
+          <h2 data-i18n="openTitle">隐私承诺可以检查，不必盲目信任。</h2>
+          <p class="section-intro" data-i18n="openIntro">CoveType 的 macOS 应用代码按 GPLv3 公开。你可以检查录音何时开始、模型在哪里运行、什么时候联网，以及文字如何插入其他应用。</p>
+          <a class="button secondary source-button" href="https://github.com/Marklucif/CoveType" data-i18n="viewSource">在 GitHub 查看源代码</a>
+        </div>
+        <div class="proof-grid" id="proofGrid">
+          <!-- GENERATED:proofGrid:START -->
+          <article><b>可审计</b><p>检查 Swift 客户端、本地 AI 工作进程、安装器、更新通道和权限处理。</p></article>
+          <article><b>无需账号</b><p>日常语音输入不要求注册、订阅身份或同步转录记录。</p></article>
+          <article><b>清晰的网络边界</b><p>首次安装、翻译语言包、更新、GitHub 反馈和源码链接可能联网；日常识别与润色始终在本地。</p></article>
+<!-- GENERATED:proofGrid:END -->
+        </div>
+      </section>
+
+      <section class="section wrap" id="languages">
+        <p class="eyebrow" data-i18n="languagesEyebrow">语言支持</p>
+        <h2 data-i18n="languagesTitle">自动检测 30 种语言。</h2>
+        <p class="section-intro narrow" data-i18n="languagesIntro">以下是本机已安装 Qwen3-ASR 模型报告的准确识别清单，粤语与中文分开列出。录音前无需手动选择口语。</p>
+        <div class="language-grid" id="languageGrid" aria-label="Supported transcription languages"><!-- GENERATED:languageGrid:START -->
+<span>中文</span><span>英语</span><span>粤语</span><span>阿拉伯语</span><span>德语</span><span>法语</span><span>西班牙语</span><span>葡萄牙语</span><span>印度尼西亚语</span><span>意大利语</span><span>韩语</span><span>俄语</span><span>泰语</span><span>越南语</span><span>日语</span><span>土耳其语</span><span>印地语</span><span>马来语</span><span>荷兰语</span><span>瑞典语</span><span>丹麦语</span><span>芬兰语</span><span>波兰语</span><span>捷克语</span><span>菲律宾语</span><span>波斯语</span><span>希腊语</span><span>罗马尼亚语</span><span>匈牙利语</span><span>马其顿语</span>
+<!-- GENERATED:languageGrid:END --></div>
+        <div class="translation-note">
+          <b data-i18n="translationTitle">翻译输出是另一项独立能力。</b>
+          <p data-i18n="translationText">识别支持 30 种语言，不等于 Apple 翻译也支持完全相同的 30 个目标语种。实际翻译语言组合取决于 macOS 版本、地区和用户已安装的语言包。</p>
+        </div>
+      </section>
+
+      <section class="section install-section" id="install">
+        <div class="wrap">
+          <p class="eyebrow" data-i18n="installEyebrow">下载与安装</p>
+          <h2 data-i18n="installTitle">面向 Apple 芯片 Mac 的引导式安装器。</h2>
+          <div class="install-layout">
+            <div class="requirements">
+              <h3 data-i18n="requirementsTitle">系统要求</h3>
+              <dl>
+                <div><dt data-i18n="computer">电脑</dt><dd data-i18n="computerValue">M1 或更新 Apple 芯片 Mac</dd></div>
+                <div><dt data-i18n="system">系统</dt><dd>macOS 15 or later</dd></div>
+                <div><dt data-i18n="memory">内存</dt><dd data-i18n="memoryValue">8 GB 可运行；建议 16 GB</dd></div>
+                <div><dt data-i18n="storage">空间</dt><dd data-i18n="storageValue">至少 5 GB 可用空间</dd></div>
+                <div><dt data-i18n="firstInstall">首次安装</dt><dd data-i18n="firstInstallValue">需要网络连接与管理员密码</dd></div>
+              </dl>
+            </div>
+            <ol class="install-steps" id="installSteps">
+              <!-- GENERATED:installSteps:START -->
+              <li><span>1</span><div><b>下载并解压</b><p>下载 CoveType 安装器 ZIP 后解压。</p></div></li>
+              <li><span>2</span><div><b>运行安装器</b><p>打开“Install CoveType.command”，它会安装应用、独立运行环境、模型和开机启动项。</p></div></li>
+              <li><span>3</span><div><b>开启两个权限</b><p>按系统语言提示开启麦克风和辅助功能；安装器会检测结果。</p></div></li>
+<!-- GENERATED:installSteps:END -->
+            </ol>
+          </div>
+          <div class="download-panel">
+            <div><b>CoveType 2.1.4</b><span data-i18n="downloadBuild">macOS 15+ · Apple 芯片 · ZIP 安装器</span></div>
+            <a class="button primary" href="https://github.com/Marklucif/CoveType/releases/download/v2.1.4-beta.1/CoveType-2.1.4-macOS-AppleSilicon-Installer.zip" data-i18n="downloadNow">立即下载</a>
+          </div>
+          <p class="checksum">SHA-256: <code>5c345c32a38f871d46ea0e320d503bb66c5d5a1d114d7431c1b78583dc272e2b</code></p>
+        </div>
+      </section>
+
+      <section class="section wrap" id="windows">
+        <div class="windows-box">
+          <div>
+            <p class="eyebrow" data-i18n="windowsEyebrow">WINDOWS 状态</p>
+            <h2 data-i18n="windowsTitle">当前应用不支持 Windows。</h2>
+          </div>
+          <div>
+            <p data-i18n="windowsIntro">当前可下载客户端依赖 macOS 专属的 AppKit/SwiftUI、AVFoundation、辅助功能 API、Apple Translation 与 MLX，不能直接复制或重新打包到 Windows。</p>
+            <details>
+              <summary data-i18n="windowsAvailableTitle">现在 Windows 上能用什么？</summary>
+              <p data-i18n="windowsAvailableText">源码仓库已包含适用于 Windows 10/11 x64 的官方 Qwen3-ASR PyTorch 后端安装脚本和浏览器麦克风测试页。它能进行本地识别测试，但还不是能在任意软件输入的系统托盘客户端。</p>
+            </details>
+            <details>
+              <summary data-i18n="windowsNeedsTitle">完整 Windows 版需要什么？</summary>
+              <p data-i18n="windowsNeedsText">需要另做 .NET 8 桌面客户端、WASAPI 录音、Windows 全局快捷键与 SendInput、PyTorch/ONNX 模型运行环境、本地翻译替代方案、签名安装器，并在真实 Windows 10/11 机器测试。建议目标配置：x64，最低 8 GB 内存、推荐 16 GB，8–10 GB 可用空间；NVIDIA 显卡不是必需，但能明显降低延迟。</p>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <section class="section wrap faq-section">
+        <p class="eyebrow" data-i18n="faqEyebrow">详细说明</p>
+        <h2 data-i18n="faqTitle">安装前须知</h2>
+        <div class="faq-list" id="faqList">
+          <!-- GENERATED:faqList:START -->
+          <details><summary>CoveType 会把语音或转录文字发送到云端吗？</summary><p>日常语音识别和可选 AI 润色都在 Mac 本地运行。首次安装需要下载模型，Apple 可能下载翻译语言包，更新检查会访问 CoveType 发布地址。</p></details>
+          <details><summary>CoveType 可以离线语音输入吗？</summary><p>可以。运行环境、Qwen 模型和所需 Apple 翻译语言包下载完成后，日常转录与本地 AI 润色无需联网。</p></details>
+          <details><summary>CoveType 免费并且开源吗？</summary><p>是。CoveType 应用源码按 GPLv3 开放；Qwen 模型、Python 软件包和 Apple 框架各自保留原许可。</p></details>
+          <details><summary>可以在任意 Mac 应用输入吗？</summary><p>CoveType 通过 macOS 辅助功能 API 在当前光标处输入，可用于编辑器、浏览器、邮件、聊天、文档和许多开发工具。</p></details>
+          <details><summary>CoveType 是完整的 macOS 输入法吗？</summary><p>不是。它是带全局按住说话快捷键的菜单栏语音输入工具，无需切换系统输入源。</p></details>
+          <details><summary>为什么需要辅助功能权限？</summary><p>macOS 要求获得此权限才能处理全局快捷键并向另一个前台应用输入文字，可随时在系统设置中撤销。</p></details>
+          <details><summary>本地 AI 润色对 30 种识别语言效果都一样吗？</summary><p>不一样。Qwen3.5 支持多语言，但不同语言的润色质量存在差异。识别支持和改写质量是两回事，重要流程请先测试。</p></details>
+<!-- GENERATED:faqList:END -->
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="wrap footer-inner">
+        <div><span class="brand-lamp" aria-hidden="true"></span><b>CoveType</b><small data-i18n="footerTagline">为 Mac 打造的隐私语音输入。</small></div>
+        <p>© 2026 CoveType · GPLv3 · <a href="#privacy" data-i18n="navPrivacy">隐私</a> · <a href="https://github.com/Marklucif/CoveType">Source Code</a> · <a href="https://github.com/Marklucif/CoveType/releases">Releases</a> · <a href="#windows" data-i18n="windowsStatusLink">Windows 状态</a></p>
+      </div>
+    </footer>
+    <noscript>This page works without JavaScript. JavaScript is only used to navigate between language versions.</noscript>
+  </body>
+</html>

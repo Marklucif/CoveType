@@ -1,0 +1,59 @@
+const fs = require("node:fs");
+const path = require("node:path");
+
+const root = __dirname;
+const pages = [
+  ["index.html", "https://marklucif.github.io/CoveType/"],
+  ["zh-cn/index.html", "https://marklucif.github.io/CoveType/zh-cn/"],
+  ["zh-tw/index.html", "https://marklucif.github.io/CoveType/zh-tw/"],
+  ["ja/index.html", "https://marklucif.github.io/CoveType/ja/"],
+  ["ko/index.html", "https://marklucif.github.io/CoveType/ko/"],
+  ["fr/index.html", "https://marklucif.github.io/CoveType/fr/"],
+  ["de/index.html", "https://marklucif.github.io/CoveType/de/"],
+  ["es/index.html", "https://marklucif.github.io/CoveType/es/"]
+];
+
+function matches(html, pattern) {
+  return [...html.matchAll(pattern)];
+}
+
+for (const [relativePath, canonicalUrl] of pages) {
+  const html = fs.readFileSync(path.join(root, relativePath), "utf8");
+  const titles = matches(html, /<title>([^<]+)<\/title>/g);
+  const descriptions = matches(html, /<meta\s+name="description"\s+content="([^"]+)"/gs);
+  const canonicals = matches(html, /<link rel="canonical" href="([^"]+)"/g);
+  const headings = matches(html, /<h1\b/g);
+  const alternates = matches(html, /<link rel="alternate" hreflang="([^"]+)" href="([^"]+)"/g);
+  const jsonLdText = html.match(/<script type="application\/ld\+json" id="structured-data">([\s\S]*?)<\/script>/)?.[1];
+
+  if (titles.length !== 1) throw new Error(`${relativePath}: expected one title`);
+  if (descriptions.length !== 1) throw new Error(`${relativePath}: expected one meta description`);
+  if (canonicals.length !== 1 || canonicals[0][1] !== canonicalUrl) throw new Error(`${relativePath}: canonical mismatch`);
+  if (headings.length !== 1) throw new Error(`${relativePath}: expected one H1`);
+  if (alternates.length !== 9) throw new Error(`${relativePath}: incomplete hreflang set`);
+  if (!jsonLdText) throw new Error(`${relativePath}: missing JSON-LD`);
+  if (/meta\s+name="keywords"/i.test(html)) throw new Error(`${relativePath}: obsolete meta keywords found`);
+  if (/content="[^"]*noindex/i.test(html)) throw new Error(`${relativePath}: page is not indexable`);
+
+  const titleLength = [...titles[0][1]].length;
+  const descriptionLength = [...descriptions[0][1]].length;
+  if (titleLength < 20 || titleLength > 65) throw new Error(`${relativePath}: title length ${titleLength}`);
+  if (descriptionLength < 60 || descriptionLength > 180) throw new Error(`${relativePath}: description length ${descriptionLength}`);
+  JSON.parse(jsonLdText);
+}
+
+const english = fs.readFileSync(path.join(root, "index.html"), "utf8").toLowerCase();
+for (const phrase of ["ai voice typing", "speech-to-text", "offline", "privacy", "local ai", "open source", "translation"]) {
+  if (!english.includes(phrase)) throw new Error(`English search intent missing: ${phrase}`);
+}
+
+const simplifiedChinese = fs.readFileSync(path.join(root, "zh-cn/index.html"), "utf8");
+for (const phrase of ["语音输入", "语音转文字", "本地", "隐私", "免费开源", "翻译"]) {
+  if (!simplifiedChinese.includes(phrase)) throw new Error(`Chinese search intent missing: ${phrase}`);
+}
+
+if (!fs.existsSync(path.join(root, "assets/covetype-social-card-seo.png"))) throw new Error("Social image missing");
+if (!fs.readFileSync(path.join(root, "robots.txt"), "utf8").includes("sitemap.xml")) throw new Error("robots.txt does not reference sitemap");
+if (matches(fs.readFileSync(path.join(root, "sitemap.xml"), "utf8"), /<loc>https:\/\/marklucif\.github\.io\/CoveType\//g).length !== pages.length) throw new Error("Sitemap URL count mismatch");
+
+console.log(`SEO validation passed for ${pages.length} localized pages.`);

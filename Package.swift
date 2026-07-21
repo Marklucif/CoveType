@@ -2,17 +2,17 @@
 import PackageDescription
 
 let package = Package(
-    name: "typeno",
+    name: "CoveType",
     platforms: [
-        .macOS(.v14)
+        .macOS(.v15)
     ],
     products: [
-        .executable(name: "TypeNo", targets: ["TypeNo"])
+        .executable(name: "CoveType", targets: ["CoveType"])
     ],
     targets: [
         .executableTarget(
-            name: "TypeNo",
-            path: "Sources/Typeno",
+            name: "CoveType",
+            path: "Sources/CoveType",
             linkerSettings: [
                 .unsafeFlags([
                     "-Xlinker", "-sectcreate", "-Xlinker", "__TEXT", "-Xlinker", "__info_plist", "-Xlinker", "App/Info.plist"

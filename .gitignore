@@ -7,5 +7,7 @@ DerivedData/
 .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
 .netrc
 /dist
+/CoveType-Website/downloads
+/CoveType-Website/.DS_Store
 /memory
 log.md

@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#07110f" />
+    <title>CoveType — Private, local AI voice typing for Mac</title>
+    <meta
+      name="description"
+      content="CoveType is a privacy-first voice typing app for Apple silicon Macs, with local Qwen3-ASR transcription, local AI polishing, and Apple on-device translation."
+    />
+    <meta property="og:title" content="CoveType — Your voice stays on your Mac" />
+    <meta
+      property="og:description"
+      content="Private local transcription, AI polishing, and optional on-device translation."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="assets/covetype-social-card.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="icon" href="assets/covetype-icon.png" />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="site.js" defer></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="#top" aria-label="CoveType home">
+        <span class="brand-lamp" aria-hidden="true"></span>
+        <span>CoveType</span>
+      </a>
+      <nav aria-label="Primary navigation">
+        <a href="#features" data-i18n="navFeatures">Features</a>
+        <a href="#privacy" data-i18n="navPrivacy">Privacy</a>
+        <a href="#languages" data-i18n="navLanguages">Languages</a>
+        <a href="#install" data-i18n="navInstall">Install</a>
+        <a href="https://github.com/Marklucif/CoveType">GitHub</a>
+      </nav>
+      <div class="top-actions">
+        <label class="visually-hidden" for="locale" data-i18n="languageSelector">Website language</label>
+        <select id="locale" aria-label="Website language">
+          <option value="en">English</option>
+          <option value="zh-Hans">简体中文</option>
+          <option value="zh-Hant">繁體中文</option>
+          <option value="ja">日本語</option>
+          <option value="ko">한국어</option>
+          <option value="fr">Français</option>
+          <option value="de">Deutsch</option>
+          <option value="es">Español</option>
+        </select>
+        <a class="small-download" href="https://github.com/Marklucif/CoveType/releases/download/v2.1.3-beta.1/CoveType-2.1.3-macOS-AppleSilicon-Installer.zip" data-i18n="downloadShort">Download</a>
+      </div>
+    </header>
+
+    <main id="top">
+      <section class="hero wrap">
+        <div class="hero-copy">
+          <p class="eyebrow" data-i18n="eyebrow">PRIVATE · LOCAL · AI</p>
+          <h1 data-i18n="heroTitle">Your voice stays on your Mac.</h1>
+          <p class="hero-text" data-i18n="heroText">
+            Hold a shortcut to speak and release it to type. CoveType transcribes with Qwen3-ASR, optionally polishes the text with a local AI model, and can translate through Apple’s on-device framework.
+          </p>
+          <div class="hero-actions">
+            <a class="button primary" href="https://github.com/Marklucif/CoveType/releases/download/v2.1.3-beta.1/CoveType-2.1.3-macOS-AppleSilicon-Installer.zip">
+              <span data-i18n="downloadMac">Download for macOS</span>
+              <small>v2.1.3 · Apple Silicon</small>
+            </a>
+            <a class="button secondary" href="#privacy" data-i18n="readPrivacy">Read the privacy details</a>
+          </div>
+          <ul class="quick-facts" aria-label="Product requirements">
+            <li>macOS 15+</li>
+            <li data-i18n="appleSilicon">Apple silicon (M1+)</li>
+            <li data-i18n="noAccount">No account</li>
+            <li>GPLv3</li>
+          </ul>
+        </div>
+        <div class="hero-card" aria-label="CoveType listening status">
+          <img src="assets/covetype-icon.png" alt="CoveType" width="112" height="112" />
+          <span class="live-line"><i></i><b data-i18n="listening">Listening</b></span>
+          <p data-i18n="releaseToType">Release to transcribe and type</p>
+          <div class="local-chip" data-i18n="processedLocally">Processed locally</div>
+        </div>
+      </section>
+
+      <section class="section wrap" id="features">
+        <p class="eyebrow" data-i18n="featuresEyebrow">WHAT IT DOES</p>
+        <h2 data-i18n="featuresTitle">Voice input without the cloud detour.</h2>
+        <div class="card-grid" id="featureGrid">
+          <article class="card"><span>01</span><h3>Local transcription</h3><p>Qwen3-ASR 0.6B 8-bit runs on Apple silicon and automatically detects 30 languages.</p></article>
+          <article class="card"><span>02</span><h3>Local AI polishing</h3><p>Qwen3.5 0.8B 4-bit can improve punctuation, sentence breaks, and spoken phrasing without a cloud writing API.</p></article>
+          <article class="card"><span>03</span><h3>Instant translation</h3><p>Speak one language and output another through Apple Translation and downloaded on-device language packs.</p></article>
+          <article class="card"><span>04</span><h3>Custom hold-to-talk</h3><p>Record a key or key combination and set the hold duration so normal shortcuts do not trigger recording.</p></article>
+          <article class="card"><span>05</span><h3>Works across apps</h3><p>Release the shortcut and CoveType inserts the result at the cursor in your current application.</p></article>
+          <article class="card"><span>06</span><h3>Made for the menu bar</h3><p>A small breathing lamp shows idle, listening, processing, and completion states. CoveType can start at login.</p></article>
+        </div>
+      </section>
+
+      <section class="section privacy-section" id="privacy">
+        <div class="wrap two-column">
+          <div>
+            <p class="eyebrow" data-i18n="privacyEyebrow">PRIVACY &amp; SECURITY</p>
+            <h2 data-i18n="privacyTitle">A local processing path you can understand.</h2>
+            <p class="section-intro" data-i18n="privacyIntro">
+              Daily transcription and AI polishing do not call cloud ASR or cloud writing APIs. Recording starts only after your configured shortcut is intentionally held.
+            </p>
+          </div>
+          <div class="plain-list" id="privacyList">
+            <div><b>Audio stays local</b><p>Temporary recordings are processed on the Mac and cleaned up after the workflow finishes.</p></div>
+            <div><b>Models stay local</b><p>Qwen3-ASR and Qwen3.5 are stored in CoveType’s local application data.</p></div>
+            <div><b>No account or sync</b><p>CoveType does not need a login and does not synchronize your transcript history.</p></div>
+            <div><b>Permissions are limited</b><p>Microphone captures speech; Accessibility listens for the global shortcut and inserts text into the active app.</p></div>
+          </div>
+        </div>
+        <div class="wrap boundary-note">
+          <b data-i18n="networkTitle">When is a network connection used?</b>
+          <p data-i18n="networkText">The first installation downloads the pinned runtime and models. macOS downloads Apple Translation language packs when needed. A configured update check may contact the release endpoint. Normal transcription and polishing remain local.</p>
+        </div>
+      </section>
+
+      <section class="section wrap" id="languages">
+        <p class="eyebrow" data-i18n="languagesEyebrow">LANGUAGE SUPPORT</p>
+        <h2 data-i18n="languagesTitle">30 languages, detected automatically.</h2>
+        <p class="section-intro narrow" data-i18n="languagesIntro">
+          This is the exact recognition list reported by the installed Qwen3-ASR model. Cantonese is listed separately from Chinese. You do not need to select the spoken language before recording.
+        </p>
+        <div class="language-grid" id="languageGrid" aria-label="Supported transcription languages"></div>
+        <div class="translation-note">
+          <b data-i18n="translationTitle">Translation output is a separate capability.</b>
+          <p data-i18n="translationText">The recognition list above does not guarantee the same 30 translation targets. Available Apple on-device translation pairs depend on the macOS version, region, and language packs installed by the user.</p>
+        </div>
+      </section>
+
+      <section class="section install-section" id="install">
+        <div class="wrap">
+          <p class="eyebrow" data-i18n="installEyebrow">DOWNLOAD &amp; INSTALL</p>
+          <h2 data-i18n="installTitle">One guided installer for Apple silicon Macs.</h2>
+          <div class="install-layout">
+            <div class="requirements">
+              <h3 data-i18n="requirementsTitle">Requirements</h3>
+              <dl>
+                <div><dt data-i18n="computer">Computer</dt><dd data-i18n="computerValue">Mac with M1 or newer Apple silicon</dd></div>
+                <div><dt data-i18n="system">System</dt><dd>macOS 15 or later</dd></div>
+                <div><dt data-i18n="memory">Memory</dt><dd data-i18n="memoryValue">8 GB workable; 16 GB recommended</dd></div>
+                <div><dt data-i18n="storage">Storage</dt><dd data-i18n="storageValue">At least 5 GB free</dd></div>
+                <div><dt data-i18n="firstInstall">First install</dt><dd data-i18n="firstInstallValue">Internet connection and an administrator password</dd></div>
+              </dl>
+            </div>
+            <ol class="install-steps" id="installSteps">
+              <li><span>1</span><div><b>Download and unzip</b><p>Open the CoveType installer ZIP and extract it.</p></div></li>
+              <li><span>2</span><div><b>Run the installer</b><p>Open “Install CoveType.command”. It installs the app, isolated runtime, models, and login item.</p></div></li>
+              <li><span>3</span><div><b>Approve two permissions</b><p>Follow the system-language guide to enable Microphone and Accessibility. The installer checks both.</p></div></li>
+            </ol>
+          </div>
+          <div class="download-panel">
+            <div><b>CoveType 2.1.3</b><span data-i18n="downloadBuild">macOS 15+ · Apple silicon · Installer ZIP</span></div>
+            <a class="button primary" href="https://github.com/Marklucif/CoveType/releases/download/v2.1.3-beta.1/CoveType-2.1.3-macOS-AppleSilicon-Installer.zip" data-i18n="downloadNow">Download now</a>
+          </div>
+          <p class="checksum">SHA-256: <code>6ea8315f9451e9661f8ad152d3f97d42087f5937a811cc9b9757419f0233d716</code></p>
+        </div>
+      </section>
+
+      <section class="section wrap" id="windows">
+        <div class="windows-box">
+          <div>
+            <p class="eyebrow" data-i18n="windowsEyebrow">WINDOWS STATUS</p>
+            <h2 data-i18n="windowsTitle">The current app does not support Windows.</h2>
+          </div>
+          <div>
+            <p data-i18n="windowsIntro">
+              The downloadable client depends on macOS-only AppKit/SwiftUI, AVFoundation, Accessibility APIs, Apple Translation, and MLX. It cannot be copied or repackaged for Windows.
+            </p>
+            <details>
+              <summary data-i18n="windowsAvailableTitle">What works on Windows today?</summary>
+              <p data-i18n="windowsAvailableText">The source repository includes a Windows 10/11 x64 bootstrap for the official Qwen3-ASR PyTorch backend and a browser microphone demo. It is a local recognition test, not yet a system-wide tray input app.</p>
+            </details>
+            <details>
+              <summary data-i18n="windowsNeedsTitle">What is required for a complete Windows release?</summary>
+              <p data-i18n="windowsNeedsText">A separate .NET 8 desktop client, WASAPI recording, Windows global hotkeys and SendInput, a PyTorch/ONNX model runtime, a local translation replacement, a signed installer, and testing on real Windows 10/11 systems. Practical target: x64, 8 GB RAM minimum, 16 GB recommended, 8–10 GB free disk; an NVIDIA GPU is optional but strongly improves latency.</p>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <section class="section wrap faq-section">
+        <p class="eyebrow" data-i18n="faqEyebrow">DETAILS</p>
+        <h2 data-i18n="faqTitle">Before you install</h2>
+        <div class="faq-list" id="faqList">
+          <details><summary>Is CoveType a full macOS input method?</summary><p>No. The current build is a menu-bar voice input utility. It uses a global hold-to-talk shortcut and inserts text into the current app, so you do not need to switch keyboard input sources.</p></details>
+          <details><summary>Why does it need Accessibility permission?</summary><p>macOS requires this permission for global shortcut handling and for inserting text into another active application. You can revoke it at any time in System Settings.</p></details>
+          <details><summary>Does local polishing support all recognition languages?</summary><p>The small Qwen3.5 model is multilingual, but quality is not identical across all 30 ASR languages. Transcription support and polishing quality are separate; test your language before relying on automatic rewriting.</p></details>
+          <details><summary>Is everything open source?</summary><p>The CoveType application code is distributed under GPLv3. Qwen models, Python packages, and Apple frameworks are governed by their respective licenses and terms.</p></details>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="wrap footer-inner">
+        <div><span class="brand-lamp" aria-hidden="true"></span><b>CoveType</b><small data-i18n="footerTagline">Private voice typing, built for your Mac.</small></div>
+        <p>© 2026 CoveType · GPLv3 · <a href="https://github.com/Marklucif/CoveType">Source Code</a> · <a href="https://github.com/Marklucif/CoveType/releases">Releases</a> · <a href="#windows" data-i18n="windowsStatusLink">Windows status</a></p>
+      </div>
+    </footer>
+    <noscript>This page works without JavaScript in English. JavaScript is only used for the language selector.</noscript>
+  </body>
+</html>

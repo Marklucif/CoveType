@@ -1,133 +1,60 @@
-# TypeNo
+# CoveType
 
-[中文](README_CN.md) | [日本語](README_JP.md)
+[中文](README_CN.md) | [Windows plan](docs/WINDOWS.md)
 
-**A free, open source, privacy-first voice input tool for macOS.**
+[Website](https://marklucif.github.io/CoveType/) · [Download](https://github.com/Marklucif/CoveType/releases/tag/v2.1.3-beta.1) · [Feedback](https://github.com/Marklucif/CoveType/issues/new) · [Upstream](https://github.com/marswaveai/TypeNo)
 
-![TypeNo hero image](assets/hero.webp)
+**CoveType** is a privacy-first, local-AI voice-input app for macOS, derived from the open-source TypeNo project. Hold a shortcut to speak, release it to transcribe locally with Qwen3-ASR, optionally polish or translate on device, and paste the result back into the previous app.
 
-A minimal macOS voice input app. TypeNo captures your voice, transcribes it locally, and pastes the result into whatever app you were using — all in under a second.
+![CoveType hero image](assets/hero.webp)
 
-Official website: [https://typeno.com](https://typeno.com)
+## Features
 
-Special thanks to [marswave ai's coli project](https://github.com/marswaveai/coli) for powering local speech recognition.
+- Local Qwen3-ASR 0.6B 8-bit recognition with automatic language detection.
+- Local Qwen3.5 0.8B 4-bit text polishing.
+- Apple on-device instant translation with 15 target-language choices.
+- Live microphone waveform and selectable input device.
+- A low-overhead breathing menu-bar lamp with distinct colors for idle, listening, local processing, completion, permission, update, and error states.
+- A native in-app feedback window for categorized change requests, optional system details, and privacy-aware review before submission.
+- On-demand AI worker with short-term reuse and idle memory release.
+- No account. Recognition, polishing, and previously downloaded translation packs work offline.
+- An isolated CoveType update channel; upstream TypeNo releases can never overwrite this local-AI build.
 
-## How It Works
-
-1. **Short-press Control** to start recording
-2. **Short-press Control** again to stop
-3. Text is automatically transcribed and pasted into your active app (also copied to clipboard)
-4. While recording, the overlay shows segmented preview text about once per second; after you stop, TypeNo still runs a final full-file transcription before pasting
-
-That's it. No windows, no settings, no accounts.
-
-## Install
-
-### Option 1 — Download the App
-
-- [Download TypeNo for macOS](https://github.com/marswaveai/TypeNo/releases/latest)
-- Download the latest `TypeNo.app.zip`
-- Unzip it
-- Move `TypeNo.app` to `/Applications`
-- Open TypeNo
-
-TypeNo is signed and notarized by Apple — it should open without any warnings.
-
-### Install the speech engine
-
-TypeNo uses [coli](https://github.com/marswaveai/coli) for local speech recognition.
-
-**Prerequisites:**
-- [Node.js](https://nodejs.org) (LTS recommended — install directly from nodejs.org for best compatibility)
-- [ffmpeg](https://ffmpeg.org) — required for audio conversion: `brew install ffmpeg`
-
-```bash
-npm install -g @marswave/coli
-```
-
-This installs the `coli` CLI itself, but it does not pre-download the speech model.
-
-If Coli is missing, TypeNo will show an in-app setup prompt with the install command.
-
-> **Node 24+:** If you get a `sherpa-onnx-node` error, build from source:
-> ```bash
-> npm install -g @marswave/coli --build-from-source
-> ```
-
-### First Launch
-
-TypeNo needs two one-time permissions:
-- **Microphone** — to capture your voice
-- **Accessibility** — to paste text into apps
-
-The app will guide you through granting these on first launch.
-
-On the first actual transcription, `coli` will also download its speech model into `~/.coli/models/`. That is a separate step from `npm install -g @marswave/coli`.
-
-### Troubleshooting: Coli Model Download Fails
-
-The speech model is downloaded from GitHub. If GitHub is inaccessible in your network, the first transcription can fail while `coli` is downloading the model.
-
-**Fix:** Enable **TUN mode** (also called Enhanced Mode) in your proxy tool to ensure all system-level traffic is routed correctly. Then trigger another transcription so `coli` can retry the model download.
-
-If `~/.coli/models/` contains a partial `.tar.bz2` archive from a failed download, delete the leftover files in that directory before retrying.
-
-```bash
-rm -rf ~/.coli/models
-```
-
-### Troubleshooting: Accessibility Permission Not Working
-
-Some users find that enabling TypeNo in **System Settings → Privacy & Security → Accessibility** has no effect — a known macOS bug. The fix:
-
-1. Select **TypeNo** in the list
-2. Click **−** to remove it
-3. Click **+** and re-add TypeNo from `/Applications`
-
-![Accessibility permission fix](assets/accessibility-fix.gif)
-
-### Option 2 — Build from Source
-
-```bash
-git clone https://github.com/marswaveai/TypeNo.git
-cd TypeNo
-scripts/generate_icon.sh
-scripts/build_app.sh
-```
-
-The app will be at `dist/TypeNo.app`. Move it to `/Applications/` for persistent permissions.
-
-## Usage
+## Shortcuts
 
 | Action | Trigger |
 |---|---|
-| Start/stop recording | Short-press `Control` (< 300ms, no other keys) |
-| Start/stop recording | Menu bar → Record |
-| Watch incremental transcription | Overlay updates about once per second while processing |
-| Choose microphone | Menu bar → Microphone → Automatic / specific device |
-| Transcribe a file | Drag `.m4a`/`.mp3`/`.wav`/`.aac` to the menu bar icon |
-| Check for updates | Menu bar → Check for Updates... |
-| Quit | Menu bar → Quit (`⌘Q`) |
+| Push to talk | Hold the recorded key or key combination, release to stop |
+| Automatic compatibility mode | Hold `Fn`, either `Option/Alt`, or either `Control` |
+| Hands-free toggle | `Fn + Space` to start/stop |
+| Cancel | `Esc` |
 
-## Uninstall
+Open menu-bar CoveType → **Shortcut Settings…** to record the physical key/key combination and choose a hold delay from 0.10 to 1.50 seconds. The default is 0.32 seconds. A modifier used in another chord before that delay expires is treated as a normal shortcut, so development shortcuts such as `Control + C` remain untouched. **Reset to Automatic** restores Fn/Option/Control compatibility mode.
 
-1. Quit TypeNo from the menu bar
-2. Drag `TypeNo.app` to Trash from `/Applications`
-3. Remove the Coli speech engine and cached models:
+## Automated macOS installation
 
-```bash
-rm -rf ~/.coli/
-npm uninstall -g @marswave/coli
+Use `dist/CoveType-2.1.3-macOS-AppleSilicon-Installer.zip`, extract it, then open `Install CoveType.command`. The installer sets up the app, isolated Python/MLX runtime, both models, launch at login, defaults, and post-install self-tests. Its permission guide follows the macOS default language, opens the correct System Settings pages, and verifies the result. Updates replace the bundle contents in place. Custom shortcut settings are preserved across upgrades.
+
+CoveType does not query or install releases from `marswaveai/TypeNo`. It uses its own manifest and releases under `Marklucif/CoveType`. See [custom update channel](docs/UPDATE_CHANNEL.md).
+
+The menu-bar **Send Feedback…** window prepares a new issue in `Marklucif/CoveType` for the user to review before publishing. It never sends feedback silently, and **Copy Feedback** remains available without a network request.
+
+The first binary is published as a public preview because Apple notarization credentials are not configured in this development environment. The app is Developer ID signed, but a downloaded build may still require **Control-click → Open** on first launch. Source builds are unaffected.
+
+Requirements: Apple Silicon, macOS 15 or later, an internet connection for first install, and 5 GB free disk space. See [the full macOS installation guide](docs/MACOS_AUTOMATED_INSTALL.md).
+
+From the source tree:
+
+```zsh
+./scripts/install_macos.command
 ```
 
-## Design Philosophy
+macOS privacy controls still require the signed-in user to approve Microphone, Accessibility, and each Apple translation language pack on first use.
 
-TypeNo does one thing: voice → text → paste. No extra UI, no preferences, no configuration. The fastest way to type is to not type at all.
+## Windows
 
-## Star History
+The macOS client cannot be copied directly to Windows because it uses AppKit/SwiftUI, AVFoundation, Apple Translation, and MLX. This repository includes an automated official Qwen3-ASR/PyTorch backend bootstrap and browser demo for Windows; a complete global-input tray client requires a separate native .NET port. See [the Windows plan](docs/WINDOWS.md).
 
-[![Star History Chart](https://api.star-history.com/svg?repos=marswaveai/TypeNo&type=Date)](https://star-history.com/#marswaveai/TypeNo&Date)
+## License and upstream
 
-## License
-
-GNU General Public License v3.0
+Based on [marswaveai/TypeNo](https://github.com/marswaveai/TypeNo), licensed under GNU General Public License v3.0. CoveType modifications are maintained at [Marklucif/CoveType](https://github.com/Marklucif/CoveType). Models and dependencies retain their respective licenses.

@@ -1,132 +1,67 @@
-# TypeNo
+# CoveType
 
-[English](README.md) | [日本語](README_JP.md)
+[English](README.md) | [Windows 方案](docs/WINDOWS.md)
 
-**免费、开源、隐私优先的 macOS 语音输入工具。**
+[产品网站](https://marklucif.github.io/CoveType/) · [下载安装](https://github.com/Marklucif/CoveType/releases/tag/v2.1.3-beta.1) · [使用反馈](https://github.com/Marklucif/CoveType/issues/new) · [上游项目](https://github.com/marswaveai/TypeNo)
 
-![TypeNo 宣传图](assets/hero.webp)
+**CoveType** 是一款主打隐私和本地 AI 的 macOS 语音输入工具，基于开源 TypeNo 项目二次开发。按住快捷键说话，松开后由本地 Qwen3-ASR 识别，可选本地润色或 Apple 设备端即时翻译，结果自动粘贴到原应用。
 
-一个极简的 macOS 语音输入应用。按下 Control 说话，TypeNo 在本地完成转录，然后自动粘贴到你正在使用的应用中——全程不到一秒。
+![CoveType 宣传图](assets/hero.webp)
 
-官方网站：[https://typeno.com](https://typeno.com)
+## 当前功能
 
-特别感谢 [marswave ai 的 coli 项目](https://github.com/marswaveai/coli) 提供本地语音识别能力。
+- Qwen3-ASR 0.6B 8-bit 本地识别，自动检测 30 种语言和 22 种中文方言。
+- Qwen3.5 0.8B 4-bit 本地文字润色，可关闭或选择轻度、正式、精简。
+- Apple Translation 设备端即时翻译，可选择 15 个目标语言选项。
+- 动态麦克风波形、自动麦克风或指定输入设备。
+- 菜单栏采用低开销呼吸灯，根据待机、聆听、本地处理、完成、权限、更新和错误显示不同颜色。
+- 客户端原生“使用反馈”窗口，支持分类修改建议、可选系统信息和提交前隐私检查。
+- 模型进程按需启动并短时复用；空闲后释放，避免长期占用大内存。
+- 无账号；识别、润色和已下载语言包的翻译不连接网络大模型。
+- 使用独立的 CoveType 更新通道，原版 TypeNo 更新不会覆盖这套本地 AI 功能。
 
-## 使用方式
-
-1. **短按 Control** 开始录音
-2. **再短按 Control** 停止
-3. 文字自动转录并粘贴到当前应用（同时复制到剪贴板）
-4. 录音时，悬浮条会大约每秒显示一次分段预览；停止后，TypeNo 仍会先执行完整文件转录，再进行粘贴
-
-就这么简单。没有窗口，没有设置，没有账号。
-
-## 安装
-
-### 方式一：直接下载
-
-- [下载 TypeNo for macOS](https://github.com/marswaveai/TypeNo/releases/latest)
-- 下载最新的 `TypeNo.app.zip`
-- 解压后将 `TypeNo.app` 拖到 `/Applications`
-- 打开 TypeNo
-
-TypeNo 已通过 Apple 签名和公证，可以直接打开使用。
-
-### 安装语音识别引擎
-
-TypeNo 使用 [coli](https://github.com/marswaveai/coli) 进行本地语音识别。
-
-**前置依赖：**
-- [Node.js](https://nodejs.org)（推荐 LTS 版本，直接从 nodejs.org 安装兼容性最好）
-- [ffmpeg](https://ffmpeg.org) — 音频转换必需：`brew install ffmpeg`
-
-```bash
-npm install -g @marswave/coli
-```
-
-这一步只会安装 `coli` 命令本身，不会提前下载语音模型。
-
-如果未安装 Coli，TypeNo 会在应用内弹出引导提示。
-
-> **Node 24+：** 如果遇到 `sherpa-onnx-node` 错误，请从源码编译安装：
-> ```bash
-> npm install -g @marswave/coli --build-from-source
-> ```
-
-### 首次启动
-
-TypeNo 需要两个一次性授权：
-- **麦克风** — 录制你的声音
-- **辅助功能** — 将文字粘贴到应用中
-
-首次启动时，应用会自动引导你完成授权。
-
-首次真正执行转录时，`coli` 还会从 GitHub 下载语音模型到 `~/.coli/models/`。这和 `npm install -g @marswave/coli` 是两个独立阶段。
-
-### 常见问题：Coli 模型下载失败
-
-语音模型从 GitHub 下载。如果你的网络无法访问 GitHub，首次转录时的模型下载会失败。
-
-**解决方法：** 在代理工具中开启 **TUN 模式**（也叫增强模式），确保系统级流量正常路由。然后重新触发一次转录，让 `coli` 再次下载模型。
-
-如果 `~/.coli/models/` 里留下了不完整的 `.tar.bz2` 文件，先删除该目录下的残留文件再重试。
-
-```bash
-rm -rf ~/.coli/models
-```
-
-### 常见问题：辅助功能权限无效
-
-部分用户在**系统设置 → 隐私与安全性 → 辅助功能**中开启 TypeNo 后仍无法使用——这是 macOS 的一个已知 bug。解决方法：
-
-1. 在列表中选中 **TypeNo**
-2. 点击 **−** 删除它
-3. 点击 **+**，从 `/Applications` 重新添加 TypeNo
-
-![辅助功能权限修复](assets/accessibility-fix.gif)
-
-### 方式二：从源码构建
-
-```bash
-git clone https://github.com/marswaveai/TypeNo.git
-cd TypeNo
-scripts/generate_icon.sh
-scripts/build_app.sh
-```
-
-应用位于 `dist/TypeNo.app`。移动到 `/Applications/` 以获得持久权限。
-
-## 操作方式
+## 快捷键
 
 | 操作 | 触发方式 |
 |---|---|
-| 开始/停止录音 | 短按 `Control`（< 300ms，不按其他键） |
-| 开始/停止录音 | 菜单栏 → Record |
-| 查看流式转录 | 转录过程中悬浮条约每秒更新一次 |
-| 选择麦克风 | 菜单栏 → 麦克风 → 自动 / 指定设备 |
-| 转录文件 | 拖拽 `.m4a`/`.mp3`/`.wav`/`.aac` 到菜单栏图标 |
-| 检查更新 | 菜单栏 → Check for Updates... |
-| 退出 | 菜单栏 → Quit（`⌘Q`） |
+| 按住说话 | 按住用户录制的单键或组合键，松开停止 |
+| 自动兼容模式 | 按住 `Fn`、任一 `Option/Alt` 或任一 `Control` |
+| 免按住模式 | `Fn + Space` 开始，再按一次停止 |
+| 取消 | `Esc` |
+| 菜单操作 | 菜单栏 → Record / Stop Recording |
 
-## 卸载
+打开菜单栏 CoveType → **快捷键设置…**，可直接录制实际键盘上的单键或组合键，并把触发前按住时长设为 0.10–1.50 秒，默认 0.32 秒。如果修饰键在时限内继续组成其他快捷键，就会取消录音触发，因此不会干扰 `Control + C` 等开发快捷键。“恢复自动兼容模式”可回到 Fn/Option/Control。
 
-1. 从菜单栏退出 TypeNo
-2. 将 `TypeNo.app` 从 `/Applications` 拖到废纸篓
-3. 移除 Coli 语音引擎和缓存的模型：
+## 自动安装
 
-```bash
-rm -rf ~/.coli/
-npm uninstall -g @marswave/coli
+完整安装包位于 `dist/CoveType-2.1.3-macOS-AppleSilicon-Installer.zip`。解压后双击 `Install CoveType.command`，脚本会自动安装应用、独立 Python/MLX 环境、两个模型、登录时自启动、默认配置并运行自检。权限向导会按照 macOS 默认语言显示说明、打开系统设置并检测授权结果。应用更新采用原位替换；用户录制的快捷键与按住时长也会保留。
+
+CoveType 不会查询或安装 `marswaveai/TypeNo` 的原版发布，而是使用 `Marklucif/CoveType` 自己的更新清单和 Release。详见 [独立更新通道说明](docs/UPDATE_CHANNEL.md)。
+
+菜单栏中的“使用反馈…”会生成 `Marklucif/CoveType` 的新 Issue 草稿，让用户检查后再公开提交；客户端不会静默发送反馈，也可以只在本地复制内容。
+
+首个二进制版本作为公开预览版发布，因为当前开发环境尚未配置 Apple 公证凭据。应用已经使用 Developer ID 签名，但其他 Mac 首次打开下载版本时仍可能需要使用“按住 Control 点击 → 打开”。从源码构建不受影响。
+
+支持 Apple 芯片与 macOS 15 以上版本，首次安装需要联网及至少 5 GB 可用空间。详见 [macOS 自动安装说明](docs/MACOS_AUTOMATED_INSTALL.md)。
+
+从源码目录直接安装：
+
+```zsh
+./scripts/install_macos.command
 ```
 
-## 设计理念
+macOS 不允许安装程序静默授予隐私权限。首次启动仍需本人允许麦克风、辅助功能，以及首次翻译时对应的 Apple 设备端语言包。
 
-TypeNo 只做一件事：语音 → 文字 → 粘贴。没有多余的 UI，没有偏好设置，没有配置项。最快的打字方式就是不打字。
+## Windows
 
-## Star History
+Windows 不能直接运行 AppKit/SwiftUI、AVFoundation、Apple Translation 与 MLX 组成的 macOS 客户端。仓库现已提供官方 Qwen3-ASR/PyTorch 后端自动安装脚本和浏览器测试入口；完整的全局输入托盘客户端需要单独的 .NET 原生移植。详见 [Windows 使用与移植方案](docs/WINDOWS.md)。
 
-[![Star History Chart](https://api.star-history.com/svg?repos=marswaveai/TypeNo&type=Date)](https://star-history.com/#marswaveai/TypeNo&Date)
+## 本地数据
 
-## 许可证
+- 新安装应用：`/Applications/CoveType.app`，无系统目录写入权限时为 `~/Applications/CoveType.app`。
+- 更新时会保留同一个 `CoveType.app` 外层目录并原位替换内容。
+- 模型、独立运行环境与版本备份统一位于 `~/Library/Application Support/CoveType`。
 
-GNU General Public License v3.0
+## 许可证与上游
+
+本项目继承上游 [marswaveai/TypeNo](https://github.com/marswaveai/TypeNo)，采用 GNU General Public License v3.0。CoveType 修改版维护于 [Marklucif/CoveType](https://github.com/Marklucif/CoveType)。Qwen 模型与依赖分别遵循其自身许可证。

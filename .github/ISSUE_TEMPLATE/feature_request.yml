@@ -1,0 +1,34 @@
+name: Feature request
+description: Suggest a change or new capability for CoveType.
+title: "[Feature] "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What would you like to change?
+      description: Describe the workflow or problem the change should improve.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Suggested behavior
+      description: Explain how you expect CoveType to work.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Shortcuts and input
+        - Speech recognition
+        - AI polishing
+        - Translation
+        - Performance and memory
+        - Privacy
+        - Windows
+        - Other
+    validations:
+      required: true

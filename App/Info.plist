@@ -5,26 +5,34 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleExecutable</key>
-	<string>TypeNo</string>
+	<string>CoveType</string>
 	<key>CFBundleIdentifier</key>
-	<string>ai.marswave.typeno</string>
+	<string>ai.covetype.app</string>
 	<key>CFBundleIconFile</key>
-	<string>TypeNo</string>
+	<string>CoveType</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>TypeNo</string>
+	<string>CoveType</string>
+	<key>CFBundleDisplayName</key>
+	<string>CoveType</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.4.0</string>
+	<string>2.1.3</string>
 	<key>CFBundleVersion</key>
-	<string>1.4.0</string>
+	<string>2.1.3</string>
 	<key>LSMinimumSystemVersion</key>
-	<string>14.0</string>
+	<string>15.0</string>
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>TypeNo needs microphone access to capture your voice for transcription.</string>
+	<string>CoveType needs microphone access to capture your voice for private on-device transcription.</string>
+	<key>CoveTypeUpdateChannelIdentifier</key>
+	<string>covetype-local-ai-stable</string>
+	<key>CoveTypeUpdateManifestURL</key>
+	<string>https://marklucif.github.io/CoveType/update.json</string>
+	<key>CoveTypeFeedbackURL</key>
+	<string>https://github.com/Marklucif/CoveType/issues/new</string>
 </dict>
 </plist>

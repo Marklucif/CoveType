@@ -1,126 +1,31 @@
-# TypeNo
+# CoveType
 
-[English](README.md) | [中文](README_CN.md)
+[English](README.md) | [简体中文](README_CN.md)
 
-**無料・オープンソース・プライバシー優先の macOS 音声入力ツール。**
+[製品サイト](https://marklucif.github.io/CoveType/) · [ダウンロード](https://github.com/Marklucif/CoveType/releases/tag/v2.1.3-beta.1) · [フィードバック](https://github.com/Marklucif/CoveType/issues/new) · [上流プロジェクト](https://github.com/marswaveai/TypeNo)
 
-![TypeNo hero image](assets/hero.webp)
+**CoveType** は、プライバシーを重視した macOS 向けローカル AI 音声入力ツールです。ショートカットを押して話し、離すと Qwen3-ASR が Mac 上で文字起こしします。必要に応じて Qwen3.5 によるローカル整文、または Apple のオンデバイス翻訳を使用できます。
 
-ミニマルな macOS 音声入力アプリ。TypeNo はあなたの声をキャプチャし、ローカルで文字起こしし、使用中のアプリに自動ペーストします — すべて1秒以内。
+## 主な機能
 
-公式サイト: [https://typeno.com](https://typeno.com)
+- Qwen3-ASR 0.6B 8-bit によるローカル音声認識と30言語の自動検出
+- Qwen3.5 0.8B 4-bit によるローカル文章整形
+- Apple Translation によるオンデバイス即時翻訳
+- 任意の物理キーまたはキー組み合わせと長押し時間の設定
+- メニューバーの呼吸ランプ、マイク選択、ログイン時の自動起動
+- アカウント不要。通常の認識と整文にクラウド AI API を使用しない設計
+- クライアント内のフィードバック画面から CoveType 自身の GitHub Issue を作成
 
-ローカル音声認識を支える [marswave ai の coli プロジェクト](https://github.com/marswaveai/coli) に感謝します。
+## 動作条件
 
-## 使い方
+- Apple シリコン（M1 以降）
+- macOS 15 以降
+- 8 GB RAM で動作、16 GB 推奨
+- 5 GB 以上の空き容量
+- 初回インストール時のインターネット接続
 
-1. **Control を短く押す** と録音開始
-2. **もう一度 Control を短く押す** と停止
-3. テキストが自動的に文字起こしされ、アクティブなアプリにペーストされます（クリップボードにもコピー）
-4. 録音中、オーバーレイは約1秒ごとに分段プレビューを表示し、停止後は貼り付け前に最終的なフル音声文字起こしを実行します
-
-それだけです。ウィンドウなし、設定なし、アカウント不要。
-
-## インストール
-
-### 方法 1：アプリをダウンロード
-
-- [TypeNo for macOS をダウンロード](https://github.com/marswaveai/TypeNo/releases/latest)
-- 最新の `TypeNo.app.zip` をダウンロード
-- 解凍して `TypeNo.app` を `/Applications` に移動
-- TypeNo を起動
-
-TypeNo は Apple の署名と公証済みです。警告なしでそのまま開けます。
-
-### 音声認識エンジンをインストール
-
-TypeNo はローカル音声認識に [coli](https://github.com/marswaveai/coli) を使用します。
-
-**前提条件：**
-- [Node.js](https://nodejs.org)（LTS 推奨 — nodejs.org から直接インストールすると互換性が高い）
-- [ffmpeg](https://ffmpeg.org) — 音声変換に必要：`brew install ffmpeg`
-
-```bash
-npm install -g @marswave/coli
-```
-
-未インストールの場合、アプリ内でガイダンスが表示されます。
-
-> **Node 24+：** `sherpa-onnx-node` エラーが出る場合はソースからビルドしてください：
-> ```bash
-> npm install -g @marswave/coli --build-from-source
-> ```
-
-### 初回起動
-
-TypeNo には一度だけ次の2つの権限が必要です：
-- **マイク** — 音声を録音するため
-- **アクセシビリティ** — テキストをアプリに貼り付けるため
-
-初回起動時にアプリが権限付与を案内します。
-
-### トラブルシューティング：Coli モデルのダウンロードが失敗する
-
-音声モデルは GitHub からダウンロードされます。ネットワークが GitHub にアクセスできない場合、ダウンロードに失敗します。
-
-**対処法：** プロキシツールで **TUN モード**（拡張モードとも呼ばれる）を有効にして、システムレベルのトラフィックが正しくルーティングされるようにしてください。その後、インストールを再試行してください：
-
-```bash
-npm install -g @marswave/coli
-```
-
-### トラブルシューティング：アクセシビリティ権限が有効にならない
-
-**システム設定 → プライバシーとセキュリティ → アクセシビリティ** で TypeNo を有効にしても反応しない場合があります — macOS の既知のバグです。対処法：
-
-1. リストで **TypeNo** を選択
-2. **−** をクリックして削除
-3. **+** をクリックして `/Applications` から TypeNo を再追加
-
-![アクセシビリティ権限の修正](assets/accessibility-fix.gif)
-
-### 方法 2：ソースからビルド
-
-```bash
-git clone https://github.com/marswaveai/TypeNo.git
-cd TypeNo
-scripts/generate_icon.sh
-scripts/build_app.sh
-```
-
-アプリは `dist/TypeNo.app` に生成されます。権限を維持するため `/Applications/` に移動してください。
-
-## 操作方法
-
-| 操作 | トリガー |
-|---|---|
-| 録音の開始/停止 | `Control` を短く押す（300ms以内、他のキーなし） |
-| 録音の開始/停止 | メニューバー → Record |
-| 逐次文字起こしを確認 | 処理中はオーバーレイが約1秒ごとに更新 |
-| マイクを選択 | メニューバー → Microphone → Automatic / デバイス名 |
-| ファイルの文字起こし | `.m4a`/`.mp3`/`.wav`/`.aac` をメニューバーアイコンにドラッグ |
-| アップデート確認 | メニューバー → Check for Updates... |
-| 終了 | メニューバー → Quit（`⌘Q`） |
-
-## アンインストール
-
-1. メニューバーから TypeNo を終了
-2. `/Applications` から `TypeNo.app` をゴミ箱に移動
-3. Coli 音声エンジンとキャッシュされたモデルを削除：
-
-```bash
-rm -rf ~/.coli/
-npm uninstall -g @marswave/coli
-```
-
-## 設計思想
-
-TypeNo がやることはひとつだけ：音声 → テキスト → ペースト。余計な UI なし、設定なし、構成不要。最速のタイピングは、タイピングしないこと。
-
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=marswaveai/TypeNo&type=Date)](https://star-history.com/#marswaveai/TypeNo&Date)
+`dist/CoveType-2.1.3-macOS-AppleSilicon-Installer.zip` を展開し、`Install CoveType.command` を開いてください。インストーラは独立した Python/MLX 環境、モデル、ログイン項目、初期設定を構成します。マイクとアクセシビリティの許可は、macOS のシステム設定でユーザー本人が承認する必要があります。
 
 ## ライセンス
 
-GNU General Public License v3.0
+[marswaveai/TypeNo](https://github.com/marswaveai/TypeNo) を基にした派生プロジェクトで、GNU GPLv3 で公開します。モデルと依存パッケージにはそれぞれのライセンスが適用されます。

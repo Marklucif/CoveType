@@ -124,7 +124,7 @@ function renderLocale(locale) {
     `            <li><span>${index + 1}</span><b>${escapeHtml(title)}</b><small>${escapeHtml(text)}</small></li>`
   ).join("\n"));
   html = replaceGenerated(html, "proofGrid", t.proofs.map(([title, text]) =>
-    `          <article><b>${escapeHtml(title)}</b><p>${escapeHtml(text)}</p></article>`
+    `          <article><h3>${escapeHtml(title)}</h3><p>${escapeHtml(text)}</p></article>`
   ).join("\n"));
   html = replaceGenerated(html, "installSteps", t.installSteps.map(([title, text], index) =>
     `              <li><span>${index + 1}</span><div><b>${escapeHtml(title)}</b><p>${escapeHtml(text)}</p></div></li>`

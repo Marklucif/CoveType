@@ -4821,7 +4821,7 @@ final class UpdateService: @unchecked Sendable {
         }
     }
 
-    func checkForUpdateDetailed() async -> CheckResult {
+    func checkForUpdateDetailed(currentVersionOverride: String? = nil) async -> CheckResult {
         guard let manifestURL = Self.configuredManifestURL else {
             return .channelNotConfigured
         }
@@ -4852,7 +4852,9 @@ final class UpdateService: @unchecked Sendable {
                 return .failed
             }
 
-            let currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0"
+            let currentVersion = currentVersionOverride
+                ?? Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
+                ?? "0"
 
             guard Self.isNewer(remote: remoteVersion, current: currentVersion) else {
                 return .upToDate
@@ -4919,15 +4921,27 @@ if let diagnosticIndex = CommandLine.arguments.firstIndex(of: "--keyboard-diagno
     RunLoop.main.run()
 } else if CommandLine.arguments.contains("--update-channel-self-test") {
     Task {
-        let result = await UpdateService().checkForUpdateDetailed()
+        let currentVersionOverride = ProcessInfo.processInfo.environment["COVETYPE_UPDATE_TEST_CURRENT_VERSION"]
+        let result = await UpdateService().checkForUpdateDetailed(
+            currentVersionOverride: currentVersionOverride
+        )
         let passed: Bool
+        let detail: String
         switch result {
-        case .channelNotConfigured:
+        case .upToDate:
             passed = true
-        default:
+            detail = "UP_TO_DATE"
+        case .updateAvailable(let release):
+            passed = true
+            detail = "UPDATE_AVAILABLE version=\(release.version) url=\(release.releasePageURL.absoluteString)"
+        case .channelNotConfigured:
             passed = false
+            detail = "CHANNEL_NOT_CONFIGURED"
+        case .failed:
+            passed = false
+            detail = "CHANNEL_CHECK_FAILED"
         }
-        print("CUSTOM_UPDATE_CHANNEL_SELF_TEST_RESULT=\(passed ? "PASS" : "FAIL")")
+        print("CUSTOM_UPDATE_CHANNEL_SELF_TEST_RESULT=\(passed ? "PASS" : "FAIL") \(detail)")
         exit(passed ? EXIT_SUCCESS : EXIT_FAILURE)
     }
     RunLoop.main.run()

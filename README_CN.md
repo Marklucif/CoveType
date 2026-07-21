@@ -2,7 +2,7 @@
 
 [English](README.md) | [Windows 方案](docs/WINDOWS.md)
 
-[产品网站](https://marklucif.github.io/CoveType/) · [下载安装](https://github.com/Marklucif/CoveType/releases/tag/v2.1.3-beta.1) · [使用反馈](https://github.com/Marklucif/CoveType/issues/new) · [上游项目](https://github.com/marswaveai/TypeNo)
+[产品网站](https://marklucif.github.io/CoveType/) · [下载安装](https://github.com/Marklucif/CoveType/releases/tag/v2.1.4-beta.1) · [使用反馈](https://github.com/Marklucif/CoveType/issues/new) · [上游项目](https://github.com/marswaveai/TypeNo)
 
 **CoveType** 是一款主打隐私和本地 AI 的 macOS 语音输入工具，基于开源 TypeNo 项目二次开发。按住快捷键说话，松开后由本地 Qwen3-ASR 识别，可选本地润色或 Apple 设备端即时翻译，结果自动粘贴到原应用。
 
@@ -34,7 +34,7 @@
 
 ## 自动安装
 
-完整安装包位于 `dist/CoveType-2.1.3-macOS-AppleSilicon-Installer.zip`。解压后双击 `Install CoveType.command`，脚本会自动安装应用、独立 Python/MLX 环境、两个模型、登录时自启动、默认配置并运行自检。权限向导会按照 macOS 默认语言显示说明、打开系统设置并检测授权结果。应用更新采用原位替换；用户录制的快捷键与按住时长也会保留。
+完整安装包位于 `dist/CoveType-2.1.4-macOS-AppleSilicon-Installer.zip`。解压后双击 `Install CoveType.command`，脚本会自动安装应用、独立 Python/MLX 环境、两个模型、登录时自启动、默认配置并运行自检。权限向导会按照 macOS 默认语言显示说明、打开系统设置并检测授权结果。应用更新采用原位替换；用户录制的快捷键与按住时长也会保留。
 
 CoveType 不会查询或安装 `marswaveai/TypeNo` 的原版发布，而是使用 `Marklucif/CoveType` 自己的更新清单和 Release。详见 [独立更新通道说明](docs/UPDATE_CHANNEL.md)。
 

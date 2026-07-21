@@ -46,10 +46,26 @@ const english = fs.readFileSync(path.join(root, "index.html"), "utf8").toLowerCa
 for (const phrase of ["ai voice typing", "speech-to-text", "offline", "privacy", "local ai", "open source", "translation"]) {
   if (!english.includes(phrase)) throw new Error(`English search intent missing: ${phrase}`);
 }
+for (const phrase of ["anonymous daily usage statistics", "enabled by default", "feedback window", "audio, transcripts, and typed text are never included"]) {
+  if (!english.includes(phrase)) throw new Error(`English telemetry disclosure missing: ${phrase}`);
+}
 
 const simplifiedChinese = fs.readFileSync(path.join(root, "zh-cn/index.html"), "utf8");
 for (const phrase of ["语音输入", "语音转文字", "本地", "隐私", "免费开源", "翻译"]) {
   if (!simplifiedChinese.includes(phrase)) throw new Error(`Chinese search intent missing: ${phrase}`);
+}
+for (const phrase of ["匿名每日使用统计", "默认开启", "使用反馈", "绝不包含录音、转录结果或输入文字"]) {
+  if (!simplifiedChinese.includes(phrase)) throw new Error(`Chinese telemetry disclosure missing: ${phrase}`);
+}
+
+for (const [relativePath] of pages) {
+  const html = fs.readFileSync(path.join(root, relativePath), "utf8");
+  if (!html.includes('class="telemetry-disclosure"')) {
+    throw new Error(`${relativePath}: telemetry disclosure missing`);
+  }
+  if (/v2\.1\.4-beta\.1|CoveType-2\.1\.4-macOS/.test(html)) {
+    throw new Error(`${relativePath}: outdated download link found`);
+  }
 }
 
 if (!fs.existsSync(path.join(root, "assets/covetype-social-card-seo.png"))) throw new Error("Social image missing");

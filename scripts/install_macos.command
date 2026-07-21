@@ -556,6 +556,7 @@ log "Running runtime and shortcut checks"
 "$RUNTIME_DIR/bin/python" -c 'import mlx, mlx_audio, mlx_lm; print("MLX_RUNTIME=PASS")'
 "$INSTALL_APP/Contents/MacOS/$APP_EXECUTABLE" --hotkey-self-test
 "$INSTALL_APP/Contents/MacOS/$APP_EXECUTABLE" --update-channel-self-test
+"$INSTALL_APP/Contents/MacOS/$APP_EXECUTABLE" --telemetry-self-test
 
 HEALTH_OUTPUT="$(printf '%s\n' \
     '{"id":"health","action":"health"}' \
@@ -570,6 +571,15 @@ if [[ "$SKIP_MODEL_TEST" -eq 0 ]]; then
     say -v Samantha -o "$TEMP_DIR/covetype-self-test.aiff" 'CoveType local speech recognition is ready.'
     afconvert "$TEMP_DIR/covetype-self-test.aiff" "$TEMP_DIR/covetype-self-test.wav" -f WAVE -d LEI16@16000
     "$INSTALL_APP/Contents/MacOS/$APP_EXECUTABLE" --local-ai-self-test "$TEMP_DIR/covetype-self-test.wav"
+fi
+
+# The previous bundle is needed only for rollback while installation checks run.
+# Remove it after a successful install so CoveType does not accumulate obsolete
+# app copies or leave duplicate privacy-permission identities on disk.
+if [[ -n "$APP_BACKUP" && -f "$APP_BACKUP" ]]; then
+    log "Removing the temporary rollback copy"
+    find "$APP_BACKUP" -delete
+    rmdir "$BACKUP_DIR" >/dev/null 2>&1 || true
 fi
 
 log "Enabling CoveType at login"

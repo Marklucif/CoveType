@@ -352,6 +352,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var permissionsGranted = false
     private var pollTimer: Timer?
     private let updateService = UpdateService()
+    private let telemetryService = TelemetryService()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -431,6 +432,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if let release = await updateService.checkForUpdate() {
                 statusItemController?.setUpdateAvailable(release.version)
             }
+        }
+
+        // Anonymous usage statistics are independent from speech processing.
+        // The service records the attempt before making one small HTTPS request,
+        // which prevents retries from exceeding once in any 24-hour period.
+        Task {
+            try? await Task.sleep(for: .seconds(3))
+            await telemetryService.sendHeartbeatIfNeeded()
         }
     }
 
@@ -3255,12 +3264,21 @@ final class FeedbackModel: ObservableObject {
     @Published var subject = ""
     @Published var details = ""
     @Published var includeSystemInfo = true
+    @Published var anonymousUsageStatisticsEnabled: Bool {
+        didSet {
+            UserDefaults.standard.anonymousUsageStatisticsEnabled = anonymousUsageStatisticsEnabled
+        }
+    }
     @Published var statusMessage = ""
     @Published var submissionConfigured = false
 
     var onCopy: (() -> Void)?
     var onSubmit: (() -> Void)?
     var onDone: (() -> Void)?
+
+    init() {
+        anonymousUsageStatisticsEnabled = UserDefaults.standard.anonymousUsageStatisticsEnabled
+    }
 
     var canPrepare: Bool {
         !subject.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -3348,6 +3366,30 @@ struct FeedbackView: View {
             .toggleStyle(.checkbox)
 
             VStack(alignment: .leading, spacing: 5) {
+                Toggle(
+                    L(
+                        "Send anonymous daily usage statistics",
+                        "发送匿名每日使用统计"
+                    ),
+                    isOn: $model.anonymousUsageStatisticsEnabled
+                )
+                .toggleStyle(.checkbox)
+
+                Text(L(
+                    "At most once every 24 hours, CoveType sends a random installation ID, app version, macOS version, and processor architecture over HTTPS. The server derives only the country and does not store your IP. Audio, transcripts, and typed text are never included.",
+                    "CoveType 每 24 小时最多通过 HTTPS 发送一次随机安装编号、应用版本、macOS 版本和处理器架构。服务器只判断国家且不保存 IP；绝不包含录音、转录结果或输入文字。"
+                ))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+                Link(
+                    L("Read privacy details", "查看隐私说明"),
+                    destination: URL(string: "https://covetype.com/#privacy")!
+                )
+                .font(.caption)
+            }
+
+            VStack(alignment: .leading, spacing: 5) {
                 Label(
                     L(
                         "Do not include recordings, passwords, private text, or other sensitive information.",
@@ -3422,7 +3464,7 @@ final class FeedbackController: NSObject, NSWindowDelegate {
     func show() {
         if window == nil {
             let newWindow = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 620, height: 610),
+                contentRect: NSRect(x: 0, y: 0, width: 620, height: 710),
                 styleMask: [.titled, .closable, .miniaturizable],
                 backing: .buffered,
                 defer: false
@@ -4945,6 +4987,10 @@ if let diagnosticIndex = CommandLine.arguments.firstIndex(of: "--keyboard-diagno
         exit(passed ? EXIT_SUCCESS : EXIT_FAILURE)
     }
     RunLoop.main.run()
+} else if CommandLine.arguments.contains("--telemetry-self-test") {
+    let passed = TelemetryService.runSelfTest()
+    print("ANONYMOUS_USAGE_TELEMETRY_SELF_TEST_RESULT=\(passed ? "PASS" : "FAIL")")
+    exit(passed ? EXIT_SUCCESS : EXIT_FAILURE)
 } else if let previewIndex = CommandLine.arguments.firstIndex(of: "--render-status-lamp-preview"),
           let previewPath = CommandLine.arguments[safe: previewIndex + 1] {
     Task { @MainActor in

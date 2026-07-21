@@ -16,3 +16,26 @@ jobs:
         uses: actions/checkout@v6
       - name: Build CoveType
         run: swift build -c release
+      - name: Verify anonymous usage telemetry policy
+        run: .build/release/CoveType --telemetry-self-test
+
+  telemetry-worker:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Telemetry-Worker
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: Telemetry-Worker/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Test telemetry worker
+        run: npm test
+      - name: Validate deployment bundle
+        run: npm run check

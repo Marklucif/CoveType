@@ -1,0 +1,15 @@
+{
+  "name": "covetype-telemetry-worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "check": "wrangler deploy --dry-run --outdir .wrangler/dry-run",
+    "deploy": "wrangler deploy",
+    "migrate": "wrangler d1 migrations apply covetype-telemetry --remote"
+  },
+  "devDependencies": {
+    "wrangler": "^4.38.0"
+  }
+}

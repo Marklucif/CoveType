@@ -2,7 +2,7 @@
 
 [中文](README_CN.md) | [Windows plan](docs/WINDOWS.md)
 
-[Website](https://covetype.com/) · [Download](https://github.com/Marklucif/CoveType/releases/tag/v2.1.4-beta.1) · [Feedback](https://github.com/Marklucif/CoveType/issues/new) · [Upstream](https://github.com/marswaveai/TypeNo)
+[Website](https://covetype.com/) · [Download](https://github.com/Marklucif/CoveType/releases/tag/v2.1.5-beta.1) · [Feedback](https://github.com/Marklucif/CoveType/issues/new) · [Privacy](docs/PRIVACY.md) · [Upstream](https://github.com/marswaveai/TypeNo)
 
 **CoveType** is a privacy-first, local-AI voice-input app for macOS, derived from the open-source TypeNo project. Hold a shortcut to speak, release it to transcribe locally with Qwen3-ASR, optionally polish or translate on device, and paste the result back into the previous app.
 
@@ -18,6 +18,7 @@
 - A native in-app feedback window for categorized change requests, optional system details, and privacy-aware review before submission.
 - On-demand AI worker with short-term reuse and idle memory release.
 - No account. Recognition, polishing, and previously downloaded translation packs work offline.
+- Anonymous usage statistics are enabled by default and can be disabled in **Send Feedback…**. One HTTPS heartbeat at most every 24 hours contains a random installation ID, app/macOS version, and architecture; the server derives the country and does not store raw IP, audio, transcripts, or typed text.
 - An isolated CoveType update channel; upstream TypeNo releases can never overwrite this local-AI build.
 
 ## Shortcuts
@@ -33,7 +34,7 @@ Open menu-bar CoveType → **Shortcut Settings…** to record the physical key/k
 
 ## Automated macOS installation
 
-Use `dist/CoveType-2.1.4-macOS-AppleSilicon-Installer.zip`, extract it, then open `Install CoveType.command`. The installer sets up the app, isolated Python/MLX runtime, both models, launch at login, defaults, and post-install self-tests. Its permission guide follows the macOS default language, opens the correct System Settings pages, and verifies the result. Updates replace the bundle contents in place. Custom shortcut settings are preserved across upgrades.
+Use `dist/CoveType-2.1.5-macOS-AppleSilicon-Installer.zip`, extract it, then open `Install CoveType.command`. The installer sets up the app, isolated Python/MLX runtime, both models, launch at login, defaults, and post-install self-tests. Its permission guide follows the macOS default language, opens the correct System Settings pages, and verifies the result. Updates replace the bundle contents in place. Custom shortcut settings are preserved across upgrades.
 
 CoveType does not query or install releases from `marswaveai/TypeNo`. It uses its own manifest and releases under `Marklucif/CoveType`. See [custom update channel](docs/UPDATE_CHANNEL.md).
 

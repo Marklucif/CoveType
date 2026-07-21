@@ -1,0 +1,26 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "covetype-telemetry",
+  "main": "src/index.js",
+  "compatibility_date": "2026-07-21",
+  "observability": {
+    "enabled": false
+  },
+  "routes": [
+    {
+      "pattern": "telemetry.covetype.com",
+      "custom_domain": true
+    }
+  ],
+  "triggers": {
+    "crons": ["17 3 * * *"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "covetype-telemetry",
+      "database_id": "a2761941-af1b-4a28-ab83-3ea3a188ef94",
+      "migrations_dir": "migrations"
+    }
+  ]
+}

@@ -66,7 +66,7 @@ function structuredData(locale, t) {
         "@id": `${baseUrl}#app`,
         name: "CoveType",
         url: baseUrl,
-        downloadUrl: "https://github.com/Marklucif/CoveType/releases/download/v2.1.8-beta.1/CoveType-2.1.8-macOS-AppleSilicon-Installer.zip",
+        downloadUrl: "https://github.com/Marklucif/CoveType/releases/download/v2.1.8-beta.2/CoveType-2.1.8-macOS-AppleSilicon-Installer.zip",
         softwareVersion: "2.1.8",
         operatingSystem: "macOS 15 or later on Apple silicon",
         applicationCategory: "UtilitiesApplication",

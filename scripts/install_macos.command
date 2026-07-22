@@ -404,6 +404,20 @@ fi
 [[ -f "$SOURCE_APP/Contents/Resources/covetype_local_ai_worker.py" ]] || fail "The local AI worker is missing."
 codesign --verify --deep --strict "$SOURCE_APP" || fail "The CoveType app signature is invalid."
 
+# A Developer ID release must retain and pass its notarization ticket. Source
+# builds are ad-hoc signed so contributors can still install them locally, but
+# the public release path must never fall back to clearing Gatekeeper metadata.
+SOURCE_IS_NOTARIZED=0
+SOURCE_SIGNATURE_DETAILS="$(codesign -dv --verbose=4 "$SOURCE_APP" 2>&1 || true)"
+if printf '%s\n' "$SOURCE_SIGNATURE_DETAILS" | grep -q '^Authority=Developer ID Application:'; then
+    log "Verifying the Apple notarization ticket and Gatekeeper acceptance"
+    xcrun stapler validate "$SOURCE_APP" >/dev/null 2>&1 \
+        || fail "The Developer ID app does not contain a valid stapled notarization ticket."
+    spctl --assess --type execute --verbose=2 "$SOURCE_APP" >/dev/null 2>&1 \
+        || fail "The notarized CoveType app did not pass Gatekeeper assessment."
+    SOURCE_IS_NOTARIZED=1
+fi
+
 UV_BIN="$TOOLS_DIR/uv"
 if [[ ! -x "$UV_BIN" ]]; then
     log "Installing uv $UV_VERSION into the private CoveType tools directory"
@@ -535,7 +549,9 @@ if pgrep -f '/CoveType\.app/Contents/MacOS/CoveType$' >/dev/null; then
 fi
 
 APP_BACKUP=""
+INSTALL_APP_EXISTED=0
 if [[ -d "$INSTALL_APP" ]]; then
+    INSTALL_APP_EXISTED=1
     APP_BACKUP="$TEMP_DIR/CoveType-rollback.app.zip"
     log "Creating a temporary rollback copy"
     ditto -c -k --keepParent "$INSTALL_APP" "$APP_BACKUP"
@@ -550,8 +566,16 @@ else
     log "Installing CoveType into $INSTALL_DIR"
     ditto "$SOURCE_APP" "$INSTALL_APP"
 fi
-xattr -cr "$INSTALL_APP"
-if ! codesign --verify --deep --strict "$INSTALL_APP"; then
+
+installed_app_is_valid() {
+    codesign --verify --deep --strict "$INSTALL_APP" || return 1
+    if [[ "$SOURCE_IS_NOTARIZED" -eq 1 ]]; then
+        xcrun stapler validate "$INSTALL_APP" >/dev/null 2>&1 || return 1
+        spctl --assess --type execute --verbose=2 "$INSTALL_APP" >/dev/null 2>&1 || return 1
+    fi
+}
+
+restore_previous_app() {
     if [[ -n "$APP_BACKUP" ]]; then
         ROLLBACK_DIR="$TEMP_DIR/rollback"
         mkdir -p "$ROLLBACK_DIR"
@@ -561,8 +585,17 @@ if ! codesign --verify --deep --strict "$INSTALL_APP"; then
             find "$INSTALL_APP/Contents" -depth -delete
             ditto "$ROLLBACK_BUNDLE/Contents" "$INSTALL_APP/Contents"
         fi
+    elif [[ "$INSTALL_APP_EXISTED" -eq 0 && -d "$INSTALL_APP" ]]; then
+        # This path was resolved above to an explicit CoveType.app destination.
+        # Remove only the incomplete bundle created by this installer run.
+        find "$INSTALL_APP" -depth -delete
     fi
-    fail "Installed app signature verification failed; the previous app was restored."
+}
+
+log "Verifying the installed application trust chain"
+if ! installed_app_is_valid; then
+    restore_previous_app
+    fail "Installed app trust verification failed; the incomplete update was rolled back."
 fi
 
 # Prevent source and backup copies with the same bundle identifier from

@@ -2,7 +2,7 @@
 
 [English](README.md) | [简体中文](README_CN.md)
 
-[製品サイト](https://covetype.com/) · [ダウンロード](https://github.com/Marklucif/CoveType/releases/tag/v2.1.8-beta.1) · [フィードバック](https://github.com/Marklucif/CoveType/issues/new) · [プライバシー](docs/PRIVACY.md) · [上流プロジェクト](https://github.com/marswaveai/TypeNo)
+[製品サイト](https://covetype.com/) · [ダウンロード](https://github.com/Marklucif/CoveType/releases/tag/v2.1.8-beta.2) · [フィードバック](https://github.com/Marklucif/CoveType/issues/new) · [プライバシー](docs/PRIVACY.md) · [上流プロジェクト](https://github.com/marswaveai/TypeNo)
 
 **CoveType** は、プライバシーを重視した macOS 向けローカル AI 音声入力ツールです。ショートカットを押して話し、離すと Qwen3-ASR が Mac 上で文字起こしします。必要に応じて Qwen3.5 によるローカル整文、または Apple のオンデバイス翻訳を使用できます。
 
@@ -27,7 +27,7 @@
 - 5 GB 以上の空き容量
 - 初回インストール時のインターネット接続
 
-`dist/CoveType-2.1.8-macOS-AppleSilicon-Installer.zip` を展開し、`Install CoveType.command` を開いてください。インストーラは独立した Python/MLX 環境、モデル、ログイン項目、初期設定を構成します。2.1.8 は Developer ID Application 署名と Apple 公証済みです。マイクとアクセシビリティの許可は、macOS のシステム設定でユーザー本人が承認する必要があります。
+`dist/CoveType-2.1.8-macOS-AppleSilicon-Installer.zip` を展開し、`Install CoveType.command` を開いてください。インストーラは独立した Python/MLX 環境、モデル、ログイン項目、初期設定を構成します。正式版では、インストール前後に Developer ID 署名、Apple 公証チケット、Gatekeeper 評価を検証します。マイクとアクセシビリティの許可は、macOS のシステム設定でユーザー本人が承認する必要があります。
 
 ## ライセンス
 

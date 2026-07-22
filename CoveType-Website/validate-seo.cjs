@@ -66,10 +66,10 @@ for (const [relativePath] of pages) {
   if (/v2\.1\.[4-7]-beta\.1|CoveType-2\.1\.[4-7]-macOS/.test(html)) {
     throw new Error(`${relativePath}: outdated download link found`);
   }
-  if (!html.includes("v2.1.8-beta.1/CoveType-2.1.8-macOS-AppleSilicon-Installer.zip")) {
+  if (!html.includes("v2.1.8-beta.2/CoveType-2.1.8-macOS-AppleSilicon-Installer.zip")) {
     throw new Error(`${relativePath}: current download link missing`);
   }
-  if (!html.includes("659c719f6b1f5c11b4f2086e0d063e4c860bacb6cf9d7d7da1745506bfd47a3c")) {
+  if (!html.includes("5b6248ad30029f43b542a530e10c71fb75b660498110fe3db97fdacd52208afb")) {
     throw new Error(`${relativePath}: current installer checksum missing`);
   }
 }

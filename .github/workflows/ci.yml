@@ -27,6 +27,13 @@ jobs:
       - name: Validate installer and local worker syntax
         run: |
           zsh -n scripts/install_macos.command scripts/build_app.sh scripts/create_macos_installer.sh
+          if grep -Eq 'xattr[[:space:]]+-cr' scripts/install_macos.command; then
+            echo 'The installer must not clear Gatekeeper quarantine metadata.' >&2
+            exit 1
+          fi
+          grep -Fq 'xcrun stapler validate "$SOURCE_APP"' scripts/install_macos.command
+          grep -Fq 'xcrun stapler validate "$INSTALL_APP"' scripts/install_macos.command
+          grep -Fq 'spctl --assess --type execute' scripts/install_macos.command
           python3 -m py_compile Resources/covetype_local_ai_worker.py
           python3 -m unittest discover -s Tests -p 'test_*.py'
 

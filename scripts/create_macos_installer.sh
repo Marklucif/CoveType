@@ -15,6 +15,18 @@ SOURCE_APP="$PROJECT_ROOT/dist/CoveType.app"
 }
 
 codesign --verify --deep --strict "$SOURCE_APP"
+EXPECTED_TEAM_ID="595SXP7Y3V"
+ACTUAL_TEAM_ID="$(codesign -dv --verbose=4 "$SOURCE_APP" 2>&1 | sed -n 's/^TeamIdentifier=//p')"
+if [[ "$ACTUAL_TEAM_ID" != "$EXPECTED_TEAM_ID" && "${ALLOW_UNNOTARIZED_PREVIEW:-0}" != "1" ]]; then
+    printf 'Refusing to package an app not signed by the CoveType release team.\n' >&2
+    exit 1
+fi
+if ! xcrun stapler validate "$SOURCE_APP" >/dev/null 2>&1 \
+    && [[ "${ALLOW_UNNOTARIZED_PREVIEW:-0}" != "1" ]]; then
+    printf 'Refusing to publish an app without a stapled Apple notarization ticket.\n' >&2
+    printf 'Set ALLOW_UNNOTARIZED_PREVIEW=1 only for a private test archive.\n' >&2
+    exit 1
+fi
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$SOURCE_APP/Contents/Info.plist")"
 PACKAGE_NAME="CoveType-$VERSION-macOS-AppleSilicon-Installer"
 OUTPUT="$PROJECT_ROOT/dist/$PACKAGE_NAME.zip"
@@ -36,12 +48,8 @@ cp "$PROJECT_ROOT/docs/MACOS_AUTOMATED_INSTALL.md" "$PACKAGE_DIR/安装说明.md
 chmod +x "$PACKAGE_DIR/Install CoveType.command"
 
 if [[ -e "$OUTPUT" ]]; then
-    PREVIOUS_OUTPUT="$PROJECT_ROOT/dist/$PACKAGE_NAME.previous.zip"
-    [[ ! -e "$PREVIOUS_OUTPUT" ]] || {
-        printf 'Refusing to overwrite existing archives: %s and %s\n' "$OUTPUT" "$PREVIOUS_OUTPUT" >&2
-        exit 1
-    }
-    mv "$OUTPUT" "$PREVIOUS_OUTPUT"
+    printf 'Refusing to overwrite the existing release archive: %s\n' "$OUTPUT" >&2
+    exit 1
 fi
 
 ditto -c -k --sequesterRsrc --keepParent "$PACKAGE_DIR" "$OUTPUT"

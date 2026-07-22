@@ -15,6 +15,24 @@
   "triggers": {
     "crons": ["17 3 * * *"]
   },
+  "ratelimits": [
+    {
+      "name": "HEARTBEAT_INSTALL_LIMITER",
+      "namespace_id": "73024001",
+      "simple": {
+        "limit": 3,
+        "period": 60
+      }
+    },
+    {
+      "name": "HEARTBEAT_SOURCE_LIMITER",
+      "namespace_id": "73024002",
+      "simple": {
+        "limit": 120,
+        "period": 60
+      }
+    }
+  ],
   "d1_databases": [
     {
       "binding": "DB",

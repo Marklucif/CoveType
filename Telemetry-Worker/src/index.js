@@ -83,6 +83,10 @@ async function handleHeartbeat(request, env) {
     return jsonResponse({ ok: false, error: validation.error }, 400);
   }
 
+  if (!(await applyHeartbeatRateLimits(request, payload.installation_id, env))) {
+    return jsonResponse({ ok: false, error: "rate_limited" }, 429);
+  }
+
   const now = new Date();
   const timestamp = now.toISOString();
   const day = isoDay(now);
@@ -232,6 +236,22 @@ export async function hashInstallID(installationID, secret) {
   );
   const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(installationID));
   return [...new Uint8Array(signature)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+export async function applyHeartbeatRateLimits(request, installationID, env) {
+  if (env.HEARTBEAT_INSTALL_LIMITER) {
+    const result = await env.HEARTBEAT_INSTALL_LIMITER.limit({ key: installationID });
+    if (!result.success) return false;
+  }
+
+  if (env.HEARTBEAT_SOURCE_LIMITER) {
+    // This value is used only as an ephemeral Cloudflare rate-limit key. It is
+    // never written to D1 or included in application statistics.
+    const source = request.headers.get("cf-connecting-ip") || "unknown-source";
+    const result = await env.HEARTBEAT_SOURCE_LIMITER.limit({ key: source });
+    if (!result.success) return false;
+  }
+  return true;
 }
 
 function jsonResponse(body, status = 200) {

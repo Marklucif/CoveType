@@ -10,6 +10,6 @@
     "migrate": "wrangler d1 migrations apply covetype-telemetry --remote"
   },
   "devDependencies": {
-    "wrangler": "^4.38.0"
+    "wrangler": "4.113.0"
   }
 }

@@ -26,6 +26,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+      - name: Generate and validate localized pages
+        run: |
+          node CoveType-Website/generate-locales.cjs
+          node CoveType-Website/validate-seo.cjs
+          git diff --exit-code -- CoveType-Website
       - name: Configure Pages
         uses: actions/configure-pages@v5
         with:

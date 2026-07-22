@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { hashInstallID, normalizeCountry, validatePayload } from "../src/index.js";
+import {
+  applyHeartbeatRateLimits,
+  hashInstallID,
+  normalizeCountry,
+  validatePayload
+} from "../src/index.js";
 
 const validPayload = {
   schema_version: 1,
@@ -35,4 +40,30 @@ test("hashes installation IDs with a server-side secret", async () => {
   assert.equal(first, second);
   assert.notEqual(first, different);
   assert.match(first, /^[0-9a-f]{64}$/);
+});
+
+test("rate limits by installation and ephemeral request source", async () => {
+  const seen = [];
+  const limiter = (name, success = true) => ({
+    async limit({ key }) {
+      seen.push([name, key]);
+      return { success };
+    }
+  });
+  const request = new Request("https://telemetry.covetype.com/v1/heartbeat", {
+    headers: { "cf-connecting-ip": "192.0.2.10" }
+  });
+  assert.equal(await applyHeartbeatRateLimits(request, validPayload.installation_id, {
+    HEARTBEAT_INSTALL_LIMITER: limiter("install"),
+    HEARTBEAT_SOURCE_LIMITER: limiter("source")
+  }), true);
+  assert.deepEqual(seen, [
+    ["install", validPayload.installation_id],
+    ["source", "192.0.2.10"]
+  ]);
+
+  assert.equal(await applyHeartbeatRateLimits(request, validPayload.installation_id, {
+    HEARTBEAT_INSTALL_LIMITER: limiter("blocked", false),
+    HEARTBEAT_SOURCE_LIMITER: limiter("unused")
+  }), false);
 });

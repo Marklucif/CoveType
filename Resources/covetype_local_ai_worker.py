@@ -41,6 +41,26 @@ def emit(payload: dict[str, Any]) -> None:
 def require_model(path: Path, display_name: str) -> None:
     if not path.is_dir() or not (path / "config.json").is_file():
         raise RuntimeError(f"{display_name} model is not installed at {path}")
+    index_path = path / "model.safetensors.index.json"
+    if index_path.is_file():
+        try:
+            index = json.loads(index_path.read_text(encoding="utf-8"))
+            shards = set(index.get("weight_map", {}).values())
+        except (OSError, json.JSONDecodeError) as error:
+            raise RuntimeError(f"{display_name} model index is invalid: {error}") from error
+        missing = [name for name in shards if not (path / name).is_file() or (path / name).stat().st_size == 0]
+        if not shards or missing:
+            raise RuntimeError(f"{display_name} model weights are incomplete at {path}")
+    elif not (path / "model.safetensors").is_file() or (path / "model.safetensors").stat().st_size == 0:
+        raise RuntimeError(f"{display_name} model weights are missing at {path}")
+
+
+def model_is_complete(path: Path, display_name: str) -> bool:
+    try:
+        require_model(path, display_name)
+        return True
+    except RuntimeError:
+        return False
 
 
 def load_asr() -> Any:
@@ -99,6 +119,12 @@ MODE_INSTRUCTIONS = {
     "concise": "Remove redundancy while preserving every key fact and intent.",
 }
 
+ZH_MODE_INSTRUCTIONS = {
+    "light": "仅删除口吃、填充词和完全重复，补充必要标点，尽量保持原句结构。",
+    "formal": "删除口吃、填充词和重复表达，修正明显语序问题，使表达自然清楚，但不要改变词义。",
+    "concise": "删除冗余和重复，同时保留每个关键信息、事实与意图。",
+}
+
 PROTECTED_PATTERNS = (
     r"https?://[A-Za-z0-9./?=_#%&+:@~\-]+|www\.[A-Za-z0-9./?=_#%&+:@~\-]+",
     r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}",
@@ -129,6 +155,14 @@ def compact_token(text: str) -> str:
     return re.sub(r"\s+", "", text).lower()
 
 
+def is_predominantly_chinese(text: str) -> bool:
+    visible = re.sub(r"\s+", "", text)
+    if not visible or re.search(r"[\u3040-\u30ff]", visible):
+        return False
+    cjk_count = len(re.findall(r"[\u3400-\u9fff]", visible))
+    return cjk_count / len(visible) >= 0.35
+
+
 def validate_polish(original: str, candidate: str, mode: str) -> None:
     if not candidate:
         raise RuntimeError("Qwen3.5 returned empty text")
@@ -138,12 +172,17 @@ def validate_polish(original: str, candidate: str, mode: str) -> None:
 
     original_size = len(re.sub(r"\s+", "", original))
     candidate_size = len(re.sub(r"\s+", "", candidate))
-    minimum_ratio = 0.45 if mode == "light" else (0.35 if mode == "formal" else 0.25)
-    maximum_ratio = 1.8 if mode != "formal" else 2.0
+    # Formal rewrites can legitimately remove a long false start or repeated
+    # question. Keep strict protected-token checks, but do not reject a useful
+    # rewrite solely because it is substantially shorter than the dictation.
+    minimum_ratio = 0.45 if mode == "light" else (0.20 if mode == "formal" else 0.25)
+    maximum_ratio = 1.8 if mode != "formal" else 2.5
     if original_size and not (original_size * minimum_ratio <= candidate_size <= original_size * maximum_ratio):
         raise RuntimeError("Polished text changed length unexpectedly")
 
     compact_candidate = compact_token(candidate)
+    if is_predominantly_chinese(original) and not is_predominantly_chinese(candidate):
+        raise RuntimeError("Qwen3.5 changed the input language")
     for token in protected_tokens(original):
         if compact_token(token) not in compact_candidate:
             raise RuntimeError(f"Polished text did not preserve protected token: {token}")
@@ -160,6 +199,23 @@ def remove_adjacent_repetitions(text: str) -> str:
     return result
 
 
+def remove_exact_repeated_sentences(text: str) -> str:
+    """Drop later exact sentence repeats produced by speech restarts."""
+    chunks = re.findall(r".*?[。！？.!?]+|.+$", text, flags=re.DOTALL)
+    if len(chunks) < 2:
+        return text
+    seen: set[str] = set()
+    kept: list[str] = []
+    for chunk in chunks:
+        key = compact_token(re.sub(r"[\s。！？.!?]+$", "", chunk))
+        if key and key in seen:
+            continue
+        if key:
+            seen.add(key)
+        kept.append(chunk)
+    return "".join(kept).strip()
+
+
 def polish(text: str, mode: str) -> dict[str, Any]:
     original = text.strip()
     if not original:
@@ -170,22 +226,41 @@ def polish(text: str, mode: str) -> dict[str, Any]:
     model_text, protected_replacements = mask_protected_tokens(original)
 
     model, tokenizer = load_polisher()
-    messages = [
-        {
-            "role": "system",
-            "content": (
-                "You are a multilingual dictation polishing engine. Detect the input language and always "
-                "return the result in that same language. Preserve every number and its formatting, date, "
-                "amount, name, proper noun, email, URL, fact, and negation. Any placeholder beginning with "
-                "ZXQKEEP and ending with QXZ must remain unchanged. Never translate, invent, explain, or "
-                "add information. Return only the polished text."
-            ),
-        },
-        {
-            "role": "user",
-            "content": f"Task: {MODE_INSTRUCTIONS[mode]}\nText:\n{model_text}",
-        },
-    ]
+    if is_predominantly_chinese(original):
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "你是中文语音输入的保守润色器。输入是中文，输出必须仍为中文，严禁翻译。"
+                    "保留所有数字及格式、日期、金额、人名、专有名词、邮箱、网址、事实、语气和否定关系。"
+                    "任何以 ZXQKEEP 开头并以 QXZ 结尾的占位符必须原样保留。"
+                    "不得编造、解释或增加信息。只输出润色后的中文，不要引号。"
+                ),
+            },
+            {
+                "role": "user",
+                "content": f"任务：{ZH_MODE_INSTRUCTIONS[mode]}\n中文口述：\n{model_text}",
+            },
+        ]
+        answer_prefix = "润色结果："
+    else:
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "You are a conservative multilingual dictation polishing engine. Detect the input language "
+                    "and return only that same language; translation is forbidden. Preserve every number and its "
+                    "formatting, date, amount, name, proper noun, email, URL, fact, tone, and negation. Any "
+                    "placeholder beginning with ZXQKEEP and ending with QXZ must remain unchanged. Never invent, "
+                    "explain, or add information. Return only the polished text without quotation marks."
+                ),
+            },
+            {
+                "role": "user",
+                "content": f"Task: {MODE_INSTRUCTIONS[mode]}\nDictation:\n{model_text}",
+            },
+        ]
+        answer_prefix = "Polished text:"
     prompt = tokenizer.apply_chat_template(
         messages,
         tokenize=False,
@@ -194,7 +269,7 @@ def polish(text: str, mode: str) -> dict[str, Any]:
     )
     # Prefilling the answer label prevents this small model from starting a
     # visible chain-of-thought even when the caller requests a direct answer.
-    prompt += "Polished text:"
+    prompt += answer_prefix
     max_tokens = max(96, min(2048, len(original) * 3 + 48))
 
     from mlx_lm import generate
@@ -209,9 +284,12 @@ def polish(text: str, mode: str) -> dict[str, Any]:
             verbose=False,
         ).strip()
     candidate = re.sub(r"^(?:Polished text|润色结果)[：:]\s*", "", candidate, flags=re.IGNORECASE).strip()
+    if len(candidate) >= 2 and candidate[0] in "\"'“‘" and candidate[-1] in "\"'”’":
+        candidate = candidate[1:-1].strip()
     for placeholder, value in protected_replacements:
         candidate = candidate.replace(placeholder, value)
     candidate = remove_adjacent_repetitions(candidate)
+    candidate = remove_exact_repeated_sentences(candidate)
     validate_polish(original, candidate, mode)
     return {"text": candidate, "seconds": round(time.perf_counter() - started, 3)}
 
@@ -255,8 +333,8 @@ def handle(command: dict[str, Any]) -> dict[str, Any]:
     if action == "health":
         return {
             "ready": True,
-            "asr_installed": (ASR_MODEL_PATH / "config.json").is_file(),
-            "polish_installed": (POLISH_MODEL_PATH / "config.json").is_file(),
+            "asr_installed": model_is_complete(ASR_MODEL_PATH, "Qwen3-ASR"),
+            "polish_installed": model_is_complete(POLISH_MODEL_PATH, "Qwen3.5"),
         }
     if action == "transcribe":
         language_value = command.get("language")

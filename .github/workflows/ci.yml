@@ -16,10 +16,19 @@ jobs:
         uses: actions/checkout@v6
       - name: Build CoveType
         run: swift build -c release
+      - name: Verify shortcut state machine
+        run: .build/release/CoveType --hotkey-self-test
       - name: Verify anonymous usage telemetry policy
         run: .build/release/CoveType --telemetry-self-test
       - name: Verify WAV audio pipeline
         run: .build/release/CoveType --audio-pipeline-self-test
+      - name: Verify custom update channel
+        run: .build/release/CoveType --update-channel-self-test
+      - name: Validate installer and local worker syntax
+        run: |
+          zsh -n scripts/install_macos.command scripts/build_app.sh scripts/create_macos_installer.sh
+          python3 -m py_compile Resources/covetype_local_ai_worker.py
+          python3 -m unittest discover -s Tests -p 'test_*.py'
 
   telemetry-worker:
     runs-on: ubuntu-latest
@@ -37,6 +46,8 @@ jobs:
           cache-dependency-path: Telemetry-Worker/package-lock.json
       - name: Install dependencies
         run: npm ci
+      - name: Audit shipped dependencies
+        run: npm audit --omit=dev
       - name: Test telemetry worker
         run: npm test
       - name: Validate deployment bundle

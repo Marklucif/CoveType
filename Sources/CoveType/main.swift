@@ -17,76 +17,6 @@ func L(_ en: String, _ zh: String) -> String {
 
 // MARK: - Hotkey Configuration
 
-enum HotkeyModifier: String, Codable, CaseIterable {
-    case leftControl  = "LeftControl"
-    case rightControl = "RightControl"
-    case leftOption   = "LeftOption"
-    case rightOption  = "RightOption"
-    case leftCommand  = "LeftCommand"
-    case rightCommand = "RightCommand"
-    case leftShift    = "LeftShift"
-    case rightShift   = "RightShift"
-
-    var symbol: String {
-        switch self {
-        case .leftControl,  .rightControl: "⌃"
-        case .leftOption,   .rightOption:  "⌥"
-        case .leftCommand,  .rightCommand: "⌘"
-        case .leftShift,    .rightShift:   "⇧"
-        }
-    }
-
-    var label: String {
-        switch self {
-        case .leftControl:  L("⌃ Left Control",  "⌃ 左 Control")
-        case .rightControl: L("⌃ Right Control", "⌃ 右 Control")
-        case .leftOption:   L("⌥ Left Option",   "⌥ 左 Option")
-        case .rightOption:  L("⌥ Right Option",  "⌥ 右 Option")
-        case .leftCommand:  L("⌘ Left Command",  "⌘ 左 Command")
-        case .rightCommand: L("⌘ Right Command", "⌘ 右 Command")
-        case .leftShift:    L("⇧ Left Shift",    "⇧ 左 Shift")
-        case .rightShift:   L("⇧ Right Shift",   "⇧ 右 Shift")
-        }
-    }
-
-    var flag: NSEvent.ModifierFlags {
-        switch self {
-        case .leftControl,  .rightControl: .control
-        case .leftOption,   .rightOption:  .option
-        case .leftCommand,  .rightCommand: .command
-        case .leftShift,    .rightShift:   .shift
-        }
-    }
-
-    var keyCode: UInt16 {
-        switch self {
-        case .leftControl:  59
-        case .rightControl: 62
-        case .leftOption:   58
-        case .rightOption:  61
-        case .leftCommand:  55
-        case .rightCommand: 54
-        case .leftShift:    56
-        case .rightShift:   60
-        }
-    }
-
-}
-
-enum TriggerMode: String, Codable, CaseIterable {
-    case holdToTalk = "HoldToTalk"
-    case singleTap = "SingleTap"
-    case doubleTap = "DoubleTap"
-
-    var label: String {
-        switch self {
-        case .holdToTalk: L("Hold to Talk", "按住说话")
-        case .singleTap: L("1× Single Tap", "1× 单击")
-        case .doubleTap: L("2× Double Tap", "2× 双击")
-        }
-    }
-}
-
 struct CustomShortcutBinding: Codable, Equatable {
     let keyCode: UInt16
     let modifierFlagsRaw: UInt
@@ -202,31 +132,11 @@ struct MicrophoneOption: Equatable {
 }
 
 extension UserDefaults {
-    private static let modifierKey   = "ai.covetype.app.hotkeyModifier"
-    private static let triggerKey    = "ai.covetype.app.triggerMode"
     private static let microphoneKey = "ai.covetype.app.microphone"
     private static let polishModeKey = "ai.covetype.app.polishMode"
     private static let translationTargetKey = "ai.covetype.app.translationTarget"
     private static let customShortcutKey = "ai.covetype.app.customShortcut"
     private static let shortcutHoldDurationKey = "ai.covetype.app.shortcutHoldDuration"
-
-    var hotkeyModifier: HotkeyModifier {
-        get {
-            guard let raw = string(forKey: Self.modifierKey),
-                  let v = HotkeyModifier(rawValue: raw) else { return .leftControl }
-            return v
-        }
-        set { set(newValue.rawValue, forKey: Self.modifierKey) }
-    }
-
-    var triggerMode: TriggerMode {
-        get {
-            guard let raw = string(forKey: Self.triggerKey),
-                  let v = TriggerMode(rawValue: raw) else { return .holdToTalk }
-            return v
-        }
-        set { set(newValue.rawValue, forKey: Self.triggerKey) }
-    }
 
     var microphoneSelection: MicrophoneSelection {
         get { MicrophoneSelection(storedValue: string(forKey: Self.microphoneKey)) }
@@ -288,6 +198,8 @@ extension Array {
 
 extension Notification.Name {
     static let hotkeyConfigChanged = Notification.Name("ai.covetype.app.hotkeyConfigChanged")
+    static let hotkeyCaptureDidBegin = Notification.Name("ai.covetype.app.hotkeyCaptureDidBegin")
+    static let hotkeyCaptureDidEnd = Notification.Name("ai.covetype.app.hotkeyCaptureDidEnd")
 }
 
 // MARK: - On-device System Translation
@@ -363,7 +275,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hotkeyMonitor = HotkeyMonitor(
             onToggle: { [weak self] in self?.handleToggle() },
             onPress: { [weak self] in self?.handleHotkeyPress() },
-            onRelease: { [weak self] in self?.handleHotkeyRelease() }
+            onRelease: { [weak self] in self?.handleHotkeyRelease() },
+            onCancel: { [weak self] in self?.cancelFlow() }
         )
 
         if CommandLine.arguments.contains("--open-shortcut-settings") {
@@ -376,6 +289,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self,
             selector: #selector(restartHotkeyMonitor),
             name: .hotkeyConfigChanged,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(suspendHotkeyMonitor),
+            name: .hotkeyCaptureDidBegin,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(restartHotkeyMonitor),
+            name: .hotkeyCaptureDidEnd,
             object: nil
         )
 
@@ -452,29 +377,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func pollStatus() {
         PermissionManager.writeStatusSnapshot()
+        let missing = PermissionManager.missingPermissions(requestMicrophoneIfNeeded: false)
+        if missing.isEmpty {
+            let hotkeyNeedsRestart = !permissionsGranted
+            permissionsGranted = true
+            if case .permissions = appState.phase {
+                appState.hidePermissions()
+            }
+            if hotkeyNeedsRestart {
+                restartHotkeyMonitor()
+            }
+            return
+        }
+
+        permissionsGranted = false
         switch appState.phase {
         case .permissions:
-            let missing = PermissionManager.missingPermissions(requestMicrophoneIfNeeded: false)
-            if missing.isEmpty {
-                let hotkeyNeedsRestart = !permissionsGranted
-                permissionsGranted = true
-                appState.hidePermissions()
-                // Recreate the global keyboard monitors as soon as Accessibility
-                // permission arrives.
-                if hotkeyNeedsRestart {
-                    restartHotkeyMonitor()
-                }
-            } else {
-                appState.showPermissions(missing)
-            }
-        case .missingColi:
-            if ColiASRService.isInstalled {
-                appState.hideColiGuidance()
-            } else if ColiASRService.isNpmAvailable {
-                // npm became available (user installed Node), trigger auto-install
-                appState.autoInstallColi()
-            }
+            appState.showPermissions(missing)
+        case .recording, .transcribing:
+            appState.cancel()
+            appState.showPermissions(missing)
         default:
+            // Do not repeatedly reopen onboarding after the user dismisses it.
+            // The next recording attempt will present the missing permissions.
             break
         }
     }
@@ -489,7 +414,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             appState.confirmInsert()
         case .transcribing, .error:
             appState.cancel()
-        case .permissions, .missingColi, .installingColi, .updating:
+        case .permissions, .updating:
             break
         }
     }
@@ -502,9 +427,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // A fresh push-to-talk gesture always wins. This prevents a slow
             // model request or a dismissed error from making the shortcut
             // appear unresponsive on the next attempt.
+            let insertionTarget = appState.insertionTargetApplication
             appState.cancel()
-            startRecording()
-        case .recording, .done, .permissions, .missingColi, .installingColi, .updating:
+            startRecording(targetApplication: insertionTarget)
+        case .recording, .done, .permissions, .updating:
             break
         }
     }
@@ -519,12 +445,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hotkeyMonitor = HotkeyMonitor(
             onToggle: { [weak self] in self?.handleToggle() },
             onPress: { [weak self] in self?.handleHotkeyPress() },
-            onRelease: { [weak self] in self?.handleHotkeyRelease() }
+            onRelease: { [weak self] in self?.handleHotkeyRelease() },
+            onCancel: { [weak self] in self?.cancelFlow() }
         )
         hotkeyMonitor?.start()
     }
 
-    private func startRecording() {
+    @objc private func suspendHotkeyMonitor() {
+        hotkeyMonitor?.stop()
+    }
+
+    private func startRecording(targetApplication: NSRunningApplication? = nil) {
         // Only check permissions if not previously granted this session
         if !permissionsGranted {
             let missing = PermissionManager.missingPermissions(requestMicrophoneIfNeeded: true, requestAccessibilityIfNeeded: true)
@@ -535,10 +466,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             permissionsGranted = true
         }
 
-        do {
-            try appState.startRecording()
-        } catch {
-            appState.showError(error.localizedDescription)
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                try await appState.startRecording(targetApplication: targetApplication)
+            } catch is CancellationError {
+                // A release/cancel may arrive while AVCaptureSession is starting.
+            } catch {
+                appState.showError(error.localizedDescription)
+            }
         }
     }
 
@@ -564,6 +500,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func performUpdate() {
+        guard case .idle = appState.phase else {
+            NSSound.beep()
+            return
+        }
         Task {
             appState.phase = .updating(L("Checking for updates...", "检查更新..."))
             appState.onOverlayRequest?(true)
@@ -633,8 +573,6 @@ enum AppPhase: Equatable {
     case transcribing(String? = nil)
     case done(String)        // transcription result, waiting for user confirm
     case permissions(Set<PermissionKind>)
-    case missingColi
-    case installingColi(String) // progress message
     case updating(String)    // progress message
     case error(String)
 
@@ -649,7 +587,7 @@ enum AppPhase: Equatable {
             return trimmed.isEmpty ? L("Transcribing...", "转录中...") : trimmed
         case .done(let text):
             return text
-        case .permissions, .missingColi, .installingColi:
+        case .permissions:
             return ""
         case .updating(let message):
             return message
@@ -680,6 +618,7 @@ final class AppState: ObservableObject {
     private var previousApp: NSRunningApplication?
     private var recordingTimer: Timer?
     private var localAIKeepAliveTimer: Timer?
+    private var activeFlowID: UUID?
     @Published var recordingElapsedSeconds: Int = 0
     @Published var microphoneLevel: Double = 0
 
@@ -689,20 +628,39 @@ final class AppState: ObservableObject {
         return String(format: "%d:%02d", m, s)
     }
 
-    func startRecording() throws {
+    var insertionTargetApplication: NSRunningApplication? {
+        previousApp
+    }
+
+    func startRecording(targetApplication: NSRunningApplication? = nil) async throws {
+        guard case .idle = phase else { throw CancellationError() }
+        let flowID = UUID()
+        activeFlowID = flowID
         transcript = ""
         microphoneLevel = 0
-        previousApp = NSWorkspace.shared.frontmostApplication
+        previousApp = targetApplication ?? NSWorkspace.shared.frontmostApplication
         recordingElapsedSeconds = 0
         phase = .recording
         onOverlayRequest?(true)
 
-        let microphone = try MicrophoneManager.resolvedDevice(for: UserDefaults.standard.microphoneSelection)
-        currentRecordingURL = try recorder.start(using: microphone) { [weak self] level in
-            Task { @MainActor in
-                self?.microphoneLevel = Double(level)
+        do {
+            let microphone = try MicrophoneManager.resolvedDevice(for: UserDefaults.standard.microphoneSelection)
+            let url = try await recorder.start(using: microphone) { [weak self] level in
+                Task { @MainActor in
+                    self?.microphoneLevel = Double(level)
+                }
             }
+            try ensureActive(flowID)
+            currentRecordingURL = url
+        } catch {
+            guard activeFlowID == flowID else { throw CancellationError() }
+            activeFlowID = nil
+            throw error
         }
+
+        // A quick release can move the flow to transcription while the capture
+        // session is still becoming ready. Do not restart recording-only work.
+        guard case .recording = phase else { return }
         beginLocalAIPrewarmIfNeeded()
         recordingTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.recordingElapsedSeconds += 1 }
@@ -710,6 +668,7 @@ final class AppState: ObservableObject {
     }
 
     func stopRecording() async throws {
+        guard let flowID = activeFlowID else { throw CancellationError() }
         localAIKeepAliveTimer?.invalidate()
         localAIKeepAliveTimer = nil
         recordingTimer?.invalidate()
@@ -719,11 +678,13 @@ final class AppState: ObservableObject {
         onOverlayRequest?(true)
 
         let url = try await recorder.stop()
+        try ensureActive(flowID)
         currentRecordingURL = url
     }
 
     func cancel() {
         let targetApp = previousApp
+        activeFlowID = nil
         let shouldCancelLocalAI: Bool
         if case .recording = phase {
             shouldCancelLocalAI = true
@@ -765,53 +726,6 @@ final class AppState: ObservableObject {
         onOverlayRequest?(false)
     }
 
-    func showMissingColi() {
-        // If npm is available, auto-install coli instead of showing manual guidance
-        if ColiASRService.isNpmAvailable {
-            autoInstallColi()
-        } else {
-            phase = .missingColi
-            onOverlayRequest?(true)
-        }
-    }
-
-    func autoInstallColi() {
-        phase = .installingColi(L("Installing coli...", "安装中..."))
-        onOverlayRequest?(true)
-
-        Task {
-            do {
-                try await ColiASRService.installColi { [weak self] message in
-                    self?.phase = .installingColi(message)
-                }
-                // Verify installation
-                if ColiASRService.isInstalled {
-                    phase = .installingColi(
-                        L(
-                            "Coli installed. The first transcription will download the speech model.",
-                            "Coli 已安装。首次转录时会下载语音模型。"
-                        )
-                    )
-                    try? await Task.sleep(for: .seconds(1.5))
-                    phase = .idle
-                    onOverlayRequest?(false)
-                } else {
-                    // Fallback to manual guidance
-                    phase = .missingColi
-                }
-            } catch {
-                showError("Install failed: \(error.localizedDescription)")
-            }
-        }
-    }
-
-    func hideColiGuidance() {
-        if case .missingColi = phase {
-            phase = .idle
-            onOverlayRequest?(false)
-        }
-    }
-
     func showError(_ message: String) {
         removeCurrentRecordingFile()
         phase = .error(message)
@@ -819,6 +733,7 @@ final class AppState: ObservableObject {
     }
 
     func transcribeAndInsert() async {
+        guard let flowID = activeFlowID else { return }
         guard let url = currentRecordingURL else {
             showError("No recording")
             return
@@ -828,22 +743,26 @@ final class AppState: ObservableObject {
         phase = .transcribing(L("Preparing local AI...", "正在准备本地 AI..."))
 
         do {
-            transcript = try await makeFinalTranscript(fileURL: url)
+            let finalTranscript = try await makeFinalTranscript(fileURL: url, flowID: flowID)
+            try ensureActive(flowID)
+            transcript = finalTranscript
 
             // Show result briefly, then auto-insert
             phase = .done(transcript)
             onOverlayRequest?(true)
-            confirmInsert()
+            confirmInsert(expectedFlowID: flowID)
         } catch is CancellationError {
             // User canceled the current transcription with Esc.
-        } catch CoveTypeError.coliNotInstalled {
-            showMissingColi()
         } catch {
-            showError(error.localizedDescription)
+            if activeFlowID == flowID {
+                showError(error.localizedDescription)
+            }
         }
     }
 
-    func confirmInsert() {
+    func confirmInsert(expectedFlowID: UUID? = nil) {
+        let flowID = expectedFlowID ?? activeFlowID
+        guard let flowID, activeFlowID == flowID else { return }
         guard !transcript.isEmpty else {
             cancel()
             return
@@ -865,6 +784,7 @@ final class AppState: ObservableObject {
         }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+            guard let self, self.activeFlowID == flowID else { return }
             let source = CGEventSource(stateID: .hidSystemState)
             let vDown = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: true)
             let vUp = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: false)
@@ -873,11 +793,12 @@ final class AppState: ObservableObject {
             vDown?.post(tap: .cghidEventTap)
             vUp?.post(tap: .cghidEventTap)
 
-            self?.resetState()
+            self.resetState(expectedFlowID: flowID)
         }
     }
 
-    private func resetState() {
+    private func resetState(expectedFlowID: UUID? = nil) {
+        if let expectedFlowID, activeFlowID != expectedFlowID { return }
         localAIKeepAliveTimer?.invalidate()
         localAIKeepAliveTimer = nil
         if let currentRecordingURL {
@@ -887,6 +808,7 @@ final class AppState: ObservableObject {
         previousApp = nil
         transcript = ""
         microphoneLevel = 0
+        activeFlowID = nil
         phase = .idle
         onOverlayRequest?(false)
     }
@@ -925,12 +847,19 @@ final class AppState: ObservableObject {
     }
 
     func releaseLocalAIMemory() async {
+        guard case .idle = phase else { return }
         await localAIService.releaseMemory()
     }
 
-    private func makeFinalTranscript(fileURL: URL) async throws -> String {
+    private func ensureActive(_ flowID: UUID) throws {
+        guard activeFlowID == flowID else { throw CancellationError() }
+    }
+
+    private func makeFinalTranscript(fileURL: URL, flowID: UUID) async throws -> String {
+        try ensureActive(flowID)
         phase = .transcribing(L("Qwen3-ASR is recognizing locally...", "Qwen3-ASR 本地识别中..."))
         let rawText = try await localAIService.transcribe(fileURL: fileURL)
+        try ensureActive(flowID)
 
         let normalized = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard normalized.isEmpty == false else {
@@ -956,7 +885,9 @@ final class AppState: ObservableObject {
 
         phase = .transcribing(L("Qwen3.5 is polishing locally...", "Qwen3.5 本地润色中..."))
         do {
-            return try await localAIService.polish(text: normalized, mode: polishMode)
+            let polished = try await localAIService.polish(text: normalized, mode: polishMode)
+            try ensureActive(flowID)
+            return polished
         } catch is CancellationError {
             throw CancellationError()
         } catch {
@@ -967,13 +898,17 @@ final class AppState: ObservableObject {
     }
 
     func transcribeFile(_ url: URL) async {
+        guard case .idle = phase else { return }
+        let flowID = UUID()
+        activeFlowID = flowID
         previousApp = NSWorkspace.shared.frontmostApplication
         transcript = ""
         phase = .transcribing(L("Preparing local AI...", "正在准备本地 AI..."))
         onOverlayRequest?(true)
 
         do {
-            transcript = try await makeFinalTranscript(fileURL: url)
+            transcript = try await makeFinalTranscript(fileURL: url, flowID: flowID)
+            try ensureActive(flowID)
 
             phase = .done(transcript)
             onOverlayRequest?(true)
@@ -981,13 +916,13 @@ final class AppState: ObservableObject {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(transcript, forType: .string)
             try? await Task.sleep(for: .seconds(2))
-            resetState()
+            resetState(expectedFlowID: flowID)
         } catch is CancellationError {
             // User canceled the current transcription with Esc.
-        } catch CoveTypeError.coliNotInstalled {
-            showMissingColi()
         } catch {
-            showError(error.localizedDescription)
+            if activeFlowID == flowID {
+                showError(error.localizedDescription)
+            }
         }
     }
 }
@@ -997,10 +932,6 @@ final class AppState: ObservableObject {
 enum CoveTypeError: LocalizedError {
     case noRecording
     case emptyTranscript
-    case coliNotInstalled
-    case npmNotFound
-    case coliInstallFailed(String)
-    case transcriptionFailed(String)
     case localAIUnavailable(String)
     case localAIProtocolError(String)
     case translationUnavailable(String)
@@ -1013,10 +944,6 @@ enum CoveTypeError: LocalizedError {
         switch self {
         case .noRecording: "No recording"
         case .emptyTranscript: "No speech detected"
-        case .coliNotInstalled: "CoveType needs the local Coli engine. Install it with: npm install -g @marswave/coli"
-        case .npmNotFound: "Node.js is required. Install it from https://nodejs.org"
-        case .coliInstallFailed(let message): "Coli install failed: \(message)"
-        case .transcriptionFailed(let message): message
         case .localAIUnavailable(let message): L("Local AI unavailable: \(message)", "本地 AI 不可用：\(message)")
         case .localAIProtocolError(let message): L("Local AI error: \(message)", "本地 AI 错误：\(message)")
         case .translationUnavailable(let message): L("Translation unavailable: \(message)", "翻译不可用：\(message)")
@@ -1192,6 +1119,7 @@ final class AudioRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, AVCap
         let recordingURL: URL
         let levelHandler: (@Sendable (Float) -> Void)?
         let audioDataQueue = DispatchQueue(label: "ai.covetype.app.recorder.audio-data")
+        let sessionQueue = DispatchQueue(label: "ai.covetype.app.recorder.session")
         var stopContinuation: CheckedContinuation<URL, Error>?
         var discardRecordingOnFinish = false
         var hasStartedRecording = false
@@ -1261,7 +1189,7 @@ final class AudioRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, AVCap
         let recorder = AudioRecorder()
         do {
             let microphone = try MicrophoneManager.resolvedDevice(for: .automatic)
-            let startedURL = try recorder.start(using: microphone)
+            let startedURL = try await recorder.start(using: microphone)
             let stoppedURL = try await recorder.stop()
             defer { try? FileManager.default.removeItem(at: stoppedURL) }
             guard startedURL == stoppedURL,
@@ -1278,7 +1206,7 @@ final class AudioRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, AVCap
     func start(
         using microphone: AVCaptureDevice,
         levelHandler: (@Sendable (Float) -> Void)? = nil
-    ) throws -> URL {
+    ) async throws -> URL {
         guard currentRecordingID == nil else {
             throw CoveTypeError.couldNotStartRecording
         }
@@ -1286,9 +1214,8 @@ final class AudioRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, AVCap
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("CoveType", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
 
-        // WAV is decoded directly by mlx-audio's bundled miniaudio path. Using
-        // M4A here would require an external ffmpeg binary, which Finder and
-        // login-item launches cannot reliably discover in the user's shell PATH.
+        // WAV is decoded directly by the bundled local audio path and behaves
+        // consistently for Finder, login-item, and Terminal launches.
         let url = directory.appendingPathComponent(UUID().uuidString).appendingPathExtension("wav")
         let session = AVCaptureSession()
         let output = AVCaptureAudioFileOutput()
@@ -1341,27 +1268,23 @@ final class AudioRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, AVCap
 
         if let dataOutput {
             let dataOutputID = ObjectIdentifier(dataOutput)
-            audioContextLock.lock()
-            audioDataContexts[dataOutputID] = context
-            audioContextLock.unlock()
-        }
-
-        session.startRunning()
-
-        // Wait for AVCaptureSession to stabilize audio format before recording.
-        // Without this, the AAC encoder may initialize with 0 Hz sample rate when
-        // the session is still negotiating the hardware format (especially during
-        // device switching or with external mics), producing empty recordings.
-        // See: https://github.com/marswaveai/TypeNo/issues/43
-        let startTime = Date()
-        while Date().timeIntervalSince(startTime) < 1.0 {
-            if let connection = output.connections.first,
-               let _ = connection.audioChannels.first,
-               connection.isActive {
-                break
+            audioContextLock.withLock {
+                audioDataContexts[dataOutputID] = context
             }
-            Thread.sleep(forTimeInterval: 0.01)
         }
+
+        // AVCaptureSession.startRunning() is synchronous and may block while the
+        // audio device negotiates its format. Keep that work off the main actor so
+        // the overlay and shortcut state remain responsive.
+        await withCheckedContinuation { continuation in
+            context.sessionQueue.async {
+                context.session.startRunning()
+                continuation.resume()
+            }
+        }
+
+        guard activeContexts[contextID] === context,
+              currentRecordingID == contextID else { throw CancellationError() }
 
         output.startRecording(to: url, outputFileType: .wav, recordingDelegate: self)
         return url
@@ -1447,13 +1370,17 @@ final class AudioRecorder: NSObject, AVCaptureFileOutputRecordingDelegate, AVCap
             audioContextLock.lock()
             audioDataContexts.removeValue(forKey: dataOutputID)
             audioContextLock.unlock()
-            dataOutput.setSampleBufferDelegate(nil, queue: nil)
         }
-        if context.session.isRunning {
-            context.session.stopRunning()
+        context.sessionQueue.async {
+            context.dataOutput?.setSampleBufferDelegate(nil, queue: nil)
+            if context.session.isRunning {
+                context.session.stopRunning()
+            }
+            context.session.beginConfiguration()
+            context.session.inputs.forEach { context.session.removeInput($0) }
+            context.session.outputs.forEach { context.session.removeOutput($0) }
+            context.session.commitConfiguration()
         }
-        context.session.inputs.forEach { context.session.removeInput($0) }
-        context.session.outputs.forEach { context.session.removeOutput($0) }
     }
 
     private func requestStop(for contextID: ObjectIdentifier, context: RecordingContext) {
@@ -1566,7 +1493,7 @@ final class LocalAIService: @unchecked Sendable {
     private var stdoutHandle: FileHandle?
     private var stderrHandle: FileHandle?
     private var stdoutBuffer = Data()
-    private var currentRequestWasCancelled = false
+    private var cancellationGeneration: UInt64 = 0
 
     func prewarm(loadASR: Bool, loadPolisher: Bool) async {
         guard loadASR || loadPolisher else { return }
@@ -1616,12 +1543,14 @@ final class LocalAIService: @unchecked Sendable {
     }
 
     func releaseMemory() async {
-        _ = try? await request(LocalAIRequest(id: UUID().uuidString, action: "release"))
+        // Releasing an already-stopped worker must not launch a new model process
+        // merely to ask that process to exit again.
+        shutdown()
     }
 
     func cancelCurrentRequest() {
         stateLock.lock()
-        currentRequestWasCancelled = true
+        cancellationGeneration &+= 1
         let activeProcess = process
         stateLock.unlock()
         if let activeProcess, activeProcess.isRunning {
@@ -1631,6 +1560,7 @@ final class LocalAIService: @unchecked Sendable {
 
     func shutdown() {
         stateLock.lock()
+        cancellationGeneration &+= 1
         let activeProcess = process
         process = nil
         stateLock.unlock()
@@ -1642,6 +1572,7 @@ final class LocalAIService: @unchecked Sendable {
     private func request(_ request: LocalAIRequest) async throws -> LocalAIResponse {
         try Task.checkCancellation()
         let encoded = try JSONEncoder().encode(request)
+        let requestGeneration = cancellationSnapshot()
 
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
@@ -1651,8 +1582,9 @@ final class LocalAIService: @unchecked Sendable {
                         return
                     }
                     do {
-                        self.markRequestStarted()
+                        try self.ensureCurrent(requestGeneration)
                         try self.ensureProcess()
+                        try self.ensureCurrent(requestGeneration)
                         guard let stdinHandle = self.stdinHandle,
                               let stdoutHandle = self.stdoutHandle else {
                             throw CoveTypeError.localAIProtocolError("Worker pipe unavailable")
@@ -1662,6 +1594,7 @@ final class LocalAIService: @unchecked Sendable {
                         try stdinHandle.write(contentsOf: line)
 
                         let responseData = try self.readLine(from: stdoutHandle)
+                        try self.ensureCurrent(requestGeneration)
                         let response = try JSONDecoder().decode(LocalAIResponse.self, from: responseData)
                         guard response.id == request.id else {
                             throw CoveTypeError.localAIProtocolError("Mismatched worker response")
@@ -1669,12 +1602,15 @@ final class LocalAIService: @unchecked Sendable {
                         guard response.ok == true else {
                             throw CoveTypeError.localAIProtocolError(response.error ?? "Unknown worker error")
                         }
-                        self.clearCancellationFlag()
                         continuation.resume(returning: response)
                     } catch {
-                        let wasCancelled = self.consumeCancellationFlag()
+                        let wasCancelled = self.isCurrent(requestGeneration) == false
                         self.discardProcess()
-                        continuation.resume(throwing: wasCancelled ? CancellationError() : error)
+                        continuation.resume(
+                            throwing: wasCancelled || error is CancellationError
+                                ? CancellationError()
+                                : error
+                        )
                     }
                 }
             }
@@ -1684,7 +1620,10 @@ final class LocalAIService: @unchecked Sendable {
     }
 
     private func ensureProcess() throws {
-        if let process, process.isRunning, stdinHandle != nil, stdoutHandle != nil {
+        if let runningProcess = processSnapshot(),
+           runningProcess.isRunning,
+           stdinHandle != nil,
+           stdoutHandle != nil {
             return
         }
         discardProcess()
@@ -1730,7 +1669,6 @@ final class LocalAIService: @unchecked Sendable {
             throw CoveTypeError.localAIUnavailable(error.localizedDescription)
         }
 
-        process = newProcess
         stdinHandle = stdinPipe.fileHandleForWriting
         stdoutHandle = stdoutPipe.fileHandleForReading
         stderrHandle = newStderrHandle
@@ -1750,12 +1688,33 @@ final class LocalAIService: @unchecked Sendable {
     }
 
     private func readLine(from handle: FileHandle) throws -> Data {
+        let deadline = Date().addingTimeInterval(300)
         while true {
             if let newline = stdoutBuffer.firstIndex(of: 0x0A) {
                 let line = Data(stdoutBuffer[..<newline])
                 stdoutBuffer.removeSubrange(...newline)
                 return line
             }
+            let remaining = deadline.timeIntervalSinceNow
+            guard remaining > 0 else {
+                throw CoveTypeError.localAIProtocolError("Local AI worker timed out")
+            }
+            var descriptor = pollfd(
+                fd: handle.fileDescriptor,
+                events: Int16(POLLIN),
+                revents: 0
+            )
+            let pollResult = Darwin.poll(
+                &descriptor,
+                1,
+                Int32(min(remaining, 1) * 1_000)
+            )
+            if pollResult == 0 { continue }
+            if pollResult < 0 && errno == EINTR { continue }
+            guard pollResult > 0 else {
+                throw CoveTypeError.localAIProtocolError("Could not read local AI response")
+            }
+
             var bytes = [UInt8](repeating: 0, count: 4096)
             let byteCount = Darwin.read(handle.fileDescriptor, &bytes, bytes.count)
             if byteCount < 0 && errno == EINTR {
@@ -1773,12 +1732,12 @@ final class LocalAIService: @unchecked Sendable {
 
     private func discardProcess() {
         stderrHandle?.readabilityHandler = nil
-        let oldProcess = process
         stdinHandle = nil
         stdoutHandle = nil
         stderrHandle = nil
         stdoutBuffer.removeAll(keepingCapacity: true)
         stateLock.lock()
+        let oldProcess = process
         process = nil
         stateLock.unlock()
         if let oldProcess, oldProcess.isRunning {
@@ -1786,746 +1745,29 @@ final class LocalAIService: @unchecked Sendable {
         }
     }
 
-    private func markRequestStarted() {
+    private func processSnapshot() -> Process? {
         stateLock.lock()
-        currentRequestWasCancelled = false
-        stateLock.unlock()
-    }
-
-    private func clearCancellationFlag() {
-        stateLock.lock()
-        currentRequestWasCancelled = false
-        stateLock.unlock()
-    }
-
-    private func consumeCancellationFlag() -> Bool {
-        stateLock.lock()
-        let result = currentRequestWasCancelled
-        currentRequestWasCancelled = false
+        let result = process
         stateLock.unlock()
         return result
     }
-}
 
-// MARK: - ASR Service
-
-/// Thread-safe mutable data buffer for pipe reading.
-private final class LockedData: @unchecked Sendable {
-    private var data = Data()
-    private let lock = NSLock()
-    func append(_ chunk: Data) { lock.lock(); data.append(chunk); lock.unlock() }
-    func read() -> Data { lock.lock(); defer { lock.unlock() }; return data }
-}
-
-final class ColiASRService: @unchecked Sendable {
-    static var isInstalled: Bool {
-        findColiPath() != nil
+    private func cancellationSnapshot() -> UInt64 {
+        stateLock.lock()
+        let result = cancellationGeneration
+        stateLock.unlock()
+        return result
     }
 
-    static var isNpmAvailable: Bool {
-        findNpmPath() != nil
+    private func isCurrent(_ generation: UInt64) -> Bool {
+        stateLock.lock()
+        let result = cancellationGeneration == generation
+        stateLock.unlock()
+        return result
     }
 
-    private struct PreviewState {
-        var process: Process
-        var stdin: FileHandle
-        var lineBuffer = ""
-        var wasCancelled = false
-    }
-
-    /// Auto-install coli via npm. Reports progress via callback.
-    static func installColi(onProgress: @MainActor @Sendable @escaping (String) -> Void) async throws {
-        guard let npmPath = findNpmPath() else {
-            throw CoveTypeError.npmNotFound
-        }
-
-        await onProgress("Installing coli...")
-
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            DispatchQueue.global(qos: .userInitiated).async {
-                do {
-                    let process = Process()
-                    process.executableURL = URL(fileURLWithPath: npmPath)
-                    process.arguments = ["install", "-g", "@marswave/coli"]
-
-                    // Set up PATH so npm can find node
-                    let npmDir = (npmPath as NSString).deletingLastPathComponent
-                    let env = ProcessInfo.processInfo.environment
-                    let home = env["HOME"] ?? ""
-                    let extraPaths = [
-                        npmDir,
-                        "/opt/homebrew/bin",
-                        "/usr/local/bin",
-                        home + "/.nvm/current/bin",
-                        home + "/.volta/bin",
-                        home + "/.local/share/fnm/aliases/default/bin"
-                    ]
-                    var processEnv = env
-                    let existingPath = env["PATH"] ?? "/usr/bin:/bin"
-                    processEnv["PATH"] = (extraPaths + [existingPath]).joined(separator: ":")
-                    process.environment = processEnv
-
-                    let stdout = Pipe()
-                    let stderr = Pipe()
-                    process.standardOutput = stdout
-                    process.standardError = stderr
-
-                    // Read pipe data asynchronously to avoid deadlock
-                    let stderrBuf = LockedData()
-                    let stderrHandle = stderr.fileHandleForReading
-
-                    stderrHandle.readabilityHandler = { handle in
-                        let data = handle.availableData
-                        if !data.isEmpty { stderrBuf.append(data) }
-                    }
-
-                    try process.run()
-
-                    // 120-second timeout for install
-                    let timeoutItem = DispatchWorkItem {
-                        if process.isRunning { process.terminate() }
-                    }
-                    DispatchQueue.global().asyncAfter(deadline: .now() + 120, execute: timeoutItem)
-
-                    process.waitUntilExit()
-                    timeoutItem.cancel()
-
-                    stderrHandle.readabilityHandler = nil
-
-                    guard process.terminationStatus == 0 else {
-                        let errorOutput = String(data: stderrBuf.read(), encoding: .utf8) ?? ""
-                        let msg = errorOutput.trimmingCharacters(in: .whitespacesAndNewlines)
-                        throw CoveTypeError.coliInstallFailed(msg.isEmpty ? "npm install failed" : msg)
-                    }
-
-                    continuation.resume()
-                } catch {
-                    continuation.resume(throwing: error)
-                }
-            }
-        }
-    }
-
-    private var currentProcess: Process?
-    private let processLock = NSLock()
-    private var currentProcessWasCancelled = false
-    private var previewState: PreviewState?
-
-    func cancelCurrentProcess() {
-        processLock.lock()
-        let proc = currentProcess
-        let previewProcess = previewState?.process
-        if proc != nil {
-            currentProcessWasCancelled = true
-        }
-        if previewState != nil {
-            previewState?.wasCancelled = true
-        }
-        currentProcess = nil
-        previewState = nil
-        processLock.unlock()
-        if let proc, proc.isRunning {
-            proc.terminate()
-        }
-        if let previewProcess, previewProcess.isRunning {
-            previewProcess.terminate()
-        }
-    }
-
-    func startPreviewStream(onPreviewText: @MainActor @escaping @Sendable (String) -> Void) {
-        processLock.lock()
-        defer { processLock.unlock() }
-        guard previewState == nil else { return }
-        guard let coliPath = Self.findColiPath() else { return }
-
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: coliPath)
-        process.arguments = ["asr-stream", "--json", "--asr-interval-ms", "1000"]
-        process.environment = Self.makeColiEnvironment(coliPath: coliPath)
-
-        let stdin = Pipe()
-        let stdout = Pipe()
-        let stderr = Pipe()
-        process.standardInput = stdin
-        process.standardOutput = stdout
-        process.standardError = stderr
-
-        let stdoutHandle = stdout.fileHandleForReading
-        stdoutHandle.readabilityHandler = { [weak self] handle in
-            let data = handle.availableData
-            guard data.isEmpty == false else { return }
-            self?.handlePreviewStdoutData(data, onPreviewText: onPreviewText)
-        }
-
-        let stderrHandle = stderr.fileHandleForReading
-        stderrHandle.readabilityHandler = { handle in
-            _ = handle.availableData
-        }
-
-        do {
-            try process.run()
-            previewState = PreviewState(process: process, stdin: stdin.fileHandleForWriting)
-        } catch {
-            stdoutHandle.readabilityHandler = nil
-            stderrHandle.readabilityHandler = nil
-        }
-    }
-
-    func sendPreviewAudio(_ data: Data, isFinal: Bool) {
-        processLock.lock()
-        guard let state = previewState else {
-            processLock.unlock()
-            return
-        }
-        let stdin = state.stdin
-        processLock.unlock()
-
-        if isFinal {
-            try? stdin.close()
-            return
-        }
-
-        guard data.isEmpty == false else { return }
-        try? stdin.write(contentsOf: data)
-    }
-
-    func finishPreviewStream() {
-        processLock.lock()
-        guard let state = previewState else {
-            processLock.unlock()
-            return
-        }
-        previewState = nil
-        processLock.unlock()
-        try? state.stdin.close()
-        // Wait briefly then terminate if still running
-        DispatchQueue.global().asyncAfter(deadline: .now() + 2) {
-            if state.process.isRunning {
-                state.process.terminate()
-            }
-        }
-    }
-
-    func transcribe(fileURL: URL) async throws -> String {
-        guard let coliPath = Self.findColiPath() else {
-            throw CoveTypeError.coliNotInstalled
-        }
-        if let modelIssue = Self.detectIncompleteModelDownload() {
-            throw CoveTypeError.transcriptionFailed(modelIssue)
-        }
-
-        // Retry once on failure (handles transient issues like ffmpeg not found)
-        var lastError: Error?
-        for attempt in 0..<2 {
-            do {
-                return try await runTranscription(fileURL: fileURL, coliPath: coliPath)
-            } catch is CancellationError {
-                throw CancellationError()
-            } catch {
-                lastError = error
-                if attempt == 0 {
-                    // Brief delay before retry
-                    try? await Task.sleep(for: .milliseconds(500))
-                }
-            }
-        }
-        throw lastError!
-    }
-
-    private func runTranscription(fileURL: URL, coliPath: String) async throws -> String {
-        return try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-                do {
-                    let process = Process()
-                    process.executableURL = URL(fileURLWithPath: coliPath)
-                    process.arguments = ["asr", fileURL.path]
-
-                    // Inherit a proper PATH so node/bun can be found
-                    let env = Self.makeColiEnvironment(coliPath: coliPath)
-
-                    process.environment = env
-
-                    let stdout = Pipe()
-                    let stderr = Pipe()
-                    process.standardOutput = stdout
-                    process.standardError = stderr
-
-                    // Read pipe data asynchronously to avoid deadlock when buffer fills up
-                    let stdoutBuf = LockedData()
-                    let stderrBuf = LockedData()
-                    let stdoutHandle = stdout.fileHandleForReading
-                    let stderrHandle = stderr.fileHandleForReading
-
-                    stdoutHandle.readabilityHandler = { handle in
-                        let data = handle.availableData
-                        guard data.isEmpty == false else { return }
-                        stdoutBuf.append(data)
-                    }
-                    stderrHandle.readabilityHandler = { handle in
-                        let data = handle.availableData
-                        if !data.isEmpty { stderrBuf.append(data) }
-                    }
-
-                    self?.processLock.lock()
-                    self?.currentProcessWasCancelled = false
-                    self?.currentProcess = process
-                    self?.processLock.unlock()
-
-                    try process.run()
-
-                    // Dynamic timeout: 2x audio duration, minimum 120s (covers model download on first run)
-                    var audioTimeout: TimeInterval = 120
-                    if let audioFile = try? AVAudioFile(forReading: fileURL) {
-                        let durationSeconds = Double(audioFile.length) / audioFile.processingFormat.sampleRate
-                        audioTimeout = max(120, durationSeconds * 2.0)
-                    }
-                    let timeoutItem = DispatchWorkItem {
-                        if process.isRunning {
-                            process.terminate()
-                        }
-                    }
-                    DispatchQueue.global().asyncAfter(deadline: .now() + audioTimeout, execute: timeoutItem)
-
-                    process.waitUntilExit()
-                    timeoutItem.cancel()
-
-                    // Stop reading handlers
-                    stdoutHandle.readabilityHandler = nil
-                    stderrHandle.readabilityHandler = nil
-
-                    self?.processLock.lock()
-                    let wasCancelled = self?.currentProcessWasCancelled ?? false
-                    self?.currentProcessWasCancelled = false
-                    self?.currentProcess = nil
-                    self?.processLock.unlock()
-
-                    guard process.terminationReason != .uncaughtSignal else {
-                        if wasCancelled {
-                            throw CancellationError()
-                        }
-                        let diagnostics = Self.timeoutDiagnostics(
-                            stdout: String(data: stdoutBuf.read(), encoding: .utf8) ?? "",
-                            stderr: String(data: stderrBuf.read(), encoding: .utf8) ?? ""
-                        )
-                        throw CoveTypeError.transcriptionFailed(diagnostics)
-                    }
-
-                    let output = String(data: stdoutBuf.read(), encoding: .utf8) ?? ""
-                    let errorOutput = String(data: stderrBuf.read(), encoding: .utf8) ?? ""
-
-                    guard process.terminationStatus == 0 else {
-                        let msg = errorOutput.trimmingCharacters(in: .whitespacesAndNewlines)
-                        throw CoveTypeError.transcriptionFailed(Self.diagnoseColiError(msg))
-                    }
-
-                    continuation.resume(returning: output.trimmingCharacters(in: .whitespacesAndNewlines))
-                } catch {
-                    continuation.resume(throwing: error)
-                }
-            }
-        }
-    }
-
-    /// Returns the macOS system HTTPS proxy as an "http://host:port" string, or nil if none is set.
-    static func systemHTTPSProxyURL() -> String? {
-        guard let proxySettings = CFNetworkCopySystemProxySettings()?.takeRetainedValue() as? [String: Any] else {
-            return nil
-        }
-        // Check HTTPS proxy first, fall back to HTTP proxy
-        if let httpsEnabled = proxySettings[kCFNetworkProxiesHTTPSEnable as String] as? Int, httpsEnabled == 1,
-           let host = proxySettings[kCFNetworkProxiesHTTPSProxy as String] as? String,
-           let port = proxySettings[kCFNetworkProxiesHTTPSPort as String] as? Int, !host.isEmpty {
-            return "http://\(host):\(port)"
-        }
-        if let httpEnabled = proxySettings[kCFNetworkProxiesHTTPEnable as String] as? Int, httpEnabled == 1,
-           let host = proxySettings[kCFNetworkProxiesHTTPProxy as String] as? String,
-           let port = proxySettings[kCFNetworkProxiesHTTPPort as String] as? Int, !host.isEmpty {
-            return "http://\(host):\(port)"
-        }
-        return nil
-    }
-
-    private func handlePreviewStdoutData(_ data: Data, onPreviewText: @MainActor @escaping @Sendable (String) -> Void) {
-        guard let chunk = String(data: data, encoding: .utf8), chunk.isEmpty == false else { return }
-
-        processLock.lock()
-        guard var state = previewState else {
-            processLock.unlock()
-            return
-        }
-        state.lineBuffer += chunk
-
-        while let newlineRange = state.lineBuffer.range(of: "\n") {
-            let line = String(state.lineBuffer[..<newlineRange.lowerBound])
-            state.lineBuffer.removeSubrange(..<newlineRange.upperBound)
-            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard trimmed.isEmpty == false else { continue }
-            if let previewText = Self.extractPreviewText(from: trimmed) {
-                Task { @MainActor in
-                    onPreviewText(previewText)
-                }
-            }
-        }
-
-        previewState = state
-        processLock.unlock()
-    }
-
-    private static func extractPreviewText(from line: String) -> String? {
-        guard let data = line.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: data) else {
-            return line.trimmingCharacters(in: .whitespacesAndNewlines)
-        }
-        return extractPreviewText(fromJSONObject: json) ?? line.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private static func extractPreviewText(fromJSONObject json: Any) -> String? {
-        if let string = json as? String {
-            let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
-            return trimmed.isEmpty ? nil : trimmed
-        }
-
-        if let array = json as? [Any] {
-            for item in array.reversed() {
-                if let text = extractPreviewText(fromJSONObject: item) {
-                    return text
-                }
-            }
-            return nil
-        }
-
-        guard let dict = json as? [String: Any] else { return nil }
-
-        let candidateKeys = ["text", "result", "sentence", "transcript", "partial", "output"]
-        for key in candidateKeys {
-            if let value = dict[key], let text = extractPreviewText(fromJSONObject: value) {
-                return text
-            }
-        }
-
-        if let segments = dict["segments"] as? [Any] {
-            let joined = segments.compactMap { extractPreviewText(fromJSONObject: $0) }.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
-            return joined.isEmpty ? nil : joined
-        }
-
-        for value in dict.values {
-            if let text = extractPreviewText(fromJSONObject: value) {
-                return text
-            }
-        }
-
-        return nil
-    }
-
-    /// Cached login shell PATH resolved once on first use. GUI apps don't inherit
-    /// the user's terminal PATH, so we spawn a login shell to get the full PATH.
-    private static let resolvedShellPath: String? = {
-        let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: shell)
-        // Use login + interactive so .zshrc / .bashrc init scripts (nvm, homebrew, etc.) run
-        process.arguments = ["-l", "-i", "-c", "echo $PATH"]
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
-        do {
-            try process.run()
-            process.waitUntilExit()
-            guard process.terminationStatus == 0 else { return nil }
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            return String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
-        } catch {
-            return nil
-        }
-    }()
-
-    private static func makeColiEnvironment(coliPath: String) -> [String: String] {
-        var env = ProcessInfo.processInfo.environment
-        let home = env["HOME"] ?? ""
-        let coliDir = (coliPath as NSString).deletingLastPathComponent
-        let extraPaths = [
-            coliDir,
-            "/opt/homebrew/bin",
-            "/usr/local/bin",
-            home + "/.bun/bin",
-            home + "/.npm-global/bin",
-            "/opt/homebrew/opt/node/bin"
-        ]
-        // Prefer: explicit extra paths → resolved shell PATH → existing process PATH
-        let shellPath = resolvedShellPath ?? ""
-        let existingPath = env["PATH"] ?? "/usr/bin:/bin"
-        let allPaths = extraPaths + (shellPath.isEmpty ? [existingPath] : [shellPath, existingPath])
-        env["PATH"] = allPaths.joined(separator: ":")
-        env["NO_UPDATE_NOTIFIER"] = "1"
-        env["npm_config_update_notifier"] = "false"
-
-        if env["HTTP_PROXY"] == nil && env["HTTPS_PROXY"] == nil && env["http_proxy"] == nil {
-            if let proxyURL = systemHTTPSProxyURL() {
-                env["HTTPS_PROXY"] = proxyURL
-                env["HTTP_PROXY"] = proxyURL
-                env["https_proxy"] = proxyURL
-                env["http_proxy"] = proxyURL
-            }
-        }
-
-        return env
-    }
-
-    private static func detectIncompleteModelDownload() -> String? {
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        let modelsDir = home.appendingPathComponent(".coli/models", isDirectory: true)
-        let modelDirName = "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17"
-        let senseVoiceDir = modelsDir.appendingPathComponent(modelDirName, isDirectory: true)
-        let senseVoiceCheckFile = senseVoiceDir.appendingPathComponent("model.int8.onnx")
-        let senseVoiceArchive = modelsDir.appendingPathComponent("\(modelDirName).tar.bz2")
-
-        let fm = FileManager.default
-        let archiveExists = fm.fileExists(atPath: senseVoiceArchive.path)
-        let dirExists = fm.fileExists(atPath: senseVoiceDir.path)
-        let modelExists = fm.fileExists(atPath: senseVoiceCheckFile.path)
-
-        // Model is fully extracted — everything is fine.
-        if modelExists { return nil }
-
-        // Archive downloaded but neither extracted dir nor model exists.
-        // Extraction likely failed (disk space, permissions, corrupt download).
-        if archiveExists && !dirExists {
-            return """
-                Coli model extraction failed. The archive downloaded but could not be extracted. \
-                Try clearing the models cache: rm -rf ~/.coli/models/\
-                Then run: coli asr --help (to trigger a fresh model download). \
-                If GitHub is inaccessible in your network, enable TUN mode in your proxy.
-                """
-                .replacingOccurrences(of: "\n                ", with: " ")
-        }
-
-        // Archive exists, dir exists, but model file is missing.
-        // Partial extraction — directory created but model.int8.onnx not written.
-        if archiveExists && dirExists && !modelExists {
-            return """
-                Coli model is partially extracted. Try clearing the models cache: \
-                rm -rf ~/.coli/models/\
-                Then run: coli asr --help (to trigger a fresh model download).
-                """
-                .replacingOccurrences(of: "\n                ", with: " ")
-        }
-
-        // No archive and no model. First-run model download hasn't happened yet
-        // (or was fully cleaned). Let coli handle it — not an error state.
-        return nil
-    }
-
-    /// Returns a user-friendly error message for common coli failure modes.
-    private static func diagnoseColiError(_ stderr: String) -> String {
-        if stderr.isEmpty { return "coli failed" }
-        let lower = stderr.lowercased()
-        if lower.contains("env: node") || lower.contains("env:node") || (lower.contains("no such file") && lower.contains("node")) {
-            return "Node.js not found. Make sure Node.js is installed (nodejs.org) and restart CoveType."
-        }
-        if lower.contains("ffmpeg") && (lower.contains("not found") || lower.contains("no such file") || lower.contains("command not found")) {
-            return "ffmpeg is required but not installed. Run: brew install ffmpeg"
-        }
-        if lower.contains("sherpa-onnx-node") || lower.contains("could not find sherpa") {
-            return "Node.js version incompatibility with native addon. Try: npm install -g @marswave/coli --build-from-source"
-        }
-        return stderr
-    }
-
-    private static func timeoutDiagnostics(stdout: String, stderr: String) -> String {
-        let combined = [stdout, stderr]
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-            .joined(separator: "\n")
-
-        if combined.isEmpty {
-            return "Transcription timed out. Coli downloads its first model on first use into ~/.coli/models. If GitHub is blocked, enable TUN/Enhanced proxy mode and try again."
-        }
-
-        let lower = combined.lowercased()
-        if lower.contains("ffmpeg") && (lower.contains("not found") || lower.contains("no such file") || lower.contains("command not found")) {
-            return "Transcription failed: ffmpeg is required but not installed. Run: brew install ffmpeg"
-        }
-
-        let condensed = combined
-            .components(separatedBy: .newlines)
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-            .suffix(6)
-            .joined(separator: " | ")
-
-        return "Transcription timed out. Coli output: \(condensed)"
-    }
-
-    static func findNpmPath() -> String? {
-        let env = ProcessInfo.processInfo.environment
-        let home = env["HOME"] ?? ""
-
-        if let pathInEnv = executableInPath(named: "npm", path: env["PATH"]) {
-            return pathInEnv
-        }
-
-        let candidates = [
-            "/opt/homebrew/bin/npm",
-            "/usr/local/bin/npm",
-            home + "/.nvm/current/bin/npm",
-            home + "/.volta/bin/npm",
-            home + "/.local/share/fnm/aliases/default/bin/npm",
-            home + "/.bun/bin/npm"
-        ]
-
-        if let found = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0) }) {
-            return found
-        }
-
-        return resolveViaShell("npm")
-    }
-
-    private static func findColiPath() -> String? {
-        let env = ProcessInfo.processInfo.environment
-        let home = env["HOME"] ?? ""
-
-        // Check current environment PATH first
-        if let pathInEnv = executableInPath(named: "coli", path: env["PATH"]) {
-            return pathInEnv
-        }
-
-        let candidates = [
-            home + "/.local/bin/coli",
-            "/opt/homebrew/bin/coli",
-            "/usr/local/bin/coli",
-            home + "/.npm-global/bin/coli",
-            home + "/.bun/bin/coli",
-            home + "/.volta/bin/coli",
-            home + "/.nvm/current/bin/coli",
-            "/opt/homebrew/opt/node/bin/coli"
-        ]
-
-        if let found = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0) }) {
-            return found
-        }
-
-        // Check fnm/nvm managed Node installs
-        let managedRoots: [(root: String, rel: String)] = [
-            (home + "/.local/share/fnm/node-versions", "installation/bin/coli"),
-            (home + "/.nvm/versions/node", "bin/coli")
-        ]
-        for managed in managedRoots {
-            if let path = newestManagedBinary(under: managed.root, relativePath: managed.rel) {
-                return path
-            }
-        }
-
-        // Use npm to find global bin directory (works even when coli is in a custom prefix)
-        if let npmGlobalBin = resolveNpmGlobalBin(), !npmGlobalBin.isEmpty {
-            let coliViaNpm = npmGlobalBin + "/coli"
-            if FileManager.default.isExecutableFile(atPath: coliViaNpm) {
-                return coliViaNpm
-            }
-        }
-
-        // Check the cached login shell PATH (resolves nvm/fnm/volta without spawning a new shell each time)
-        if let shellPath = resolvedShellPath, let found = executableInPath(named: "coli", path: shellPath) {
-            return found
-        }
-
-        // Final fallback: spawn a login shell to resolve coli
-        return resolveViaShell("coli")
-    }
-
-    private static func executableInPath(named name: String, path: String?) -> String? {
-        guard let path else { return nil }
-        for dir in path.split(separator: ":") {
-            let full = String(dir) + "/\(name)"
-            if FileManager.default.isExecutableFile(atPath: full) { return full }
-        }
-        return nil
-    }
-
-    private static func newestManagedBinary(under rootPath: String, relativePath: String) -> String? {
-        let fm = FileManager.default
-        let rootURL = URL(fileURLWithPath: rootPath, isDirectory: true)
-        guard let entries = try? fm.contentsOfDirectory(
-            at: rootURL,
-            includingPropertiesForKeys: [.isDirectoryKey, .contentModificationDateKey],
-            options: [.skipsHiddenFiles]
-        ) else { return nil }
-
-        let sorted = entries
-            .filter { (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true }
-            .sorted {
-                let d1 = (try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
-                let d2 = (try? $1.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
-                return d1 != d2 ? d1 > d2 : $0.lastPathComponent > $1.lastPathComponent
-            }
-
-        for dir in sorted {
-            let path = dir.path + "/" + relativePath
-            if fm.isExecutableFile(atPath: path) { return path }
-        }
-        return nil
-    }
-
-    private static func resolveViaShell(_ command: String) -> String? {
-        let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
-        // Use -i (interactive) so nvm/fnm/volta init scripts in .zshrc are loaded
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: shell)
-        process.arguments = ["-l", "-i", "-c", "command -v \(command)"]
-
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
-
-        do {
-            try process.run()
-            process.waitUntilExit()
-
-            guard process.terminationStatus == 0 else { return nil }
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            let path = String(data: data, encoding: .utf8)?
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-
-            guard let path, !path.isEmpty,
-                  FileManager.default.isExecutableFile(atPath: path) else {
-                return nil
-            }
-            return path
-        } catch {
-            return nil
-        }
-    }
-
-    /// Resolve the npm global bin directory by asking npm itself via a login shell.
-    private static func resolveNpmGlobalBin() -> String? {
-        let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: shell)
-        process.arguments = ["-l", "-i", "-c", "npm bin -g 2>/dev/null || npm prefix -g 2>/dev/null"]
-
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
-
-        do {
-            try process.run()
-            process.waitUntilExit()
-
-            guard process.terminationStatus == 0 else { return nil }
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            let output = String(data: data, encoding: .utf8)?
-                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-
-            // npm bin -g returns the bin path directly
-            // npm prefix -g returns the prefix, bin is prefix/bin
-            if output.hasSuffix("/bin") {
-                return output
-            } else if !output.isEmpty {
-                return output + "/bin"
-            }
-            return nil
-        } catch {
-            return nil
-        }
+    private func ensureCurrent(_ generation: UInt64) throws {
+        guard isCurrent(generation) else { throw CancellationError() }
     }
 }
 
@@ -2628,6 +1870,7 @@ final class HotkeyMonitor {
     private let onToggle: () -> Void
     private let onPress: () -> Void
     private let onRelease: () -> Void
+    private let onCancel: () -> Void
     private let customBinding: CustomShortcutBinding?
     private let customHoldDuration: TimeInterval
     private var flagsMonitor: Any?
@@ -2648,6 +1891,7 @@ final class HotkeyMonitor {
         onToggle: @escaping () -> Void,
         onPress: @escaping () -> Void,
         onRelease: @escaping () -> Void,
+        onCancel: @escaping () -> Void,
         customBinding: CustomShortcutBinding? = nil,
         holdDuration: TimeInterval? = nil,
         loadStoredShortcut: Bool = true
@@ -2655,6 +1899,7 @@ final class HotkeyMonitor {
         self.onToggle = onToggle
         self.onPress = onPress
         self.onRelease = onRelease
+        self.onCancel = onCancel
         self.customBinding = loadStoredShortcut
             ? UserDefaults.standard.customShortcutBinding
             : customBinding
@@ -2675,6 +1920,7 @@ final class HotkeyMonitor {
             onToggle: { events.append("toggle") },
             onPress: { events.append("press") },
             onRelease: { events.append("release") },
+            onCancel: { events.append("cancel") },
             holdDuration: Self.standardHoldDelay,
             loadStoredShortcut: false
         )
@@ -2736,7 +1982,14 @@ final class HotkeyMonitor {
         monitor.handleFlagsChanged(keyEvent(type: .flagsChanged, keyCode: leftControlKeyCode, flags: []))
         try? await Task.sleep(for: .milliseconds(370))
 
-        let expected = ["press", "release", "press", "release", "press", "release", "toggle"]
+        // Even after dictation has started, turning the held modifier into a
+        // normal chord must discard that recording instead of transcribing it.
+        monitor.handleFlagsChanged(keyEvent(type: .flagsChanged, keyCode: leftControlKeyCode, flags: .control))
+        try? await Task.sleep(for: .milliseconds(370))
+        monitor.handleKeyEvent(keyEvent(type: .keyDown, keyCode: 8, flags: .control, characters: "c"))
+        monitor.handleFlagsChanged(keyEvent(type: .flagsChanged, keyCode: leftControlKeyCode, flags: []))
+
+        let expected = ["press", "release", "press", "release", "press", "release", "toggle", "press", "cancel"]
         var customEvents: [String] = []
         let customBinding = CustomShortcutBinding(
             keyCode: 40,
@@ -2748,6 +2001,7 @@ final class HotkeyMonitor {
             onToggle: { customEvents.append("toggle") },
             onPress: { customEvents.append("press") },
             onRelease: { customEvents.append("release") },
+            onCancel: { customEvents.append("cancel") },
             customBinding: customBinding,
             holdDuration: 0.10,
             loadStoredShortcut: false
@@ -2772,6 +2026,7 @@ final class HotkeyMonitor {
             onToggle: { modifierRecoveryEvents.append("toggle") },
             onPress: { modifierRecoveryEvents.append("press") },
             onRelease: { modifierRecoveryEvents.append("release") },
+            onCancel: { modifierRecoveryEvents.append("cancel") },
             customBinding: commandBinding,
             holdDuration: 0.10,
             loadStoredShortcut: false
@@ -2805,7 +2060,7 @@ final class HotkeyMonitor {
     func stop() {
         cancelPendingHold()
         if activeHoldKey != nil {
-            onRelease()
+            onCancel()
         }
         activeHoldKey = nil
         functionIsDown = false
@@ -2893,6 +2148,9 @@ final class HotkeyMonitor {
         default:
             // A second modifier means the user is entering a normal shortcut.
             cancelPendingHold()
+            if activeHoldKey != nil {
+                cancelActiveHold()
+            }
         }
     }
 
@@ -2915,12 +2173,12 @@ final class HotkeyMonitor {
             return
         }
 
-        // Any ordinary key means Fn/Right Option is being used as a modifier,
-        // not as dictation. If recording already started, stop it immediately
-        // and allow the user's original shortcut to continue normally.
+        // Any ordinary key means the held modifier is part of a normal shortcut.
+        // If recording already started, discard it so Ctrl+C and similar chords
+        // can never paste an accidental transcript.
         cancelPendingHold()
         if activeHoldKey != nil {
-            finishActiveHold()
+            cancelActiveHold()
         }
     }
 
@@ -2965,7 +2223,7 @@ final class HotkeyMonitor {
             // as Control+C. Cancel before the configured hold time elapses.
             cancelPendingHold()
             if activeHoldKey == .custom {
-                finishActiveHold()
+                cancelActiveHold()
             }
             return
         }
@@ -2991,7 +2249,7 @@ final class HotkeyMonitor {
         guard event.type == .keyDown, !event.isARepeat else { return }
         cancelPendingHold()
         if activeHoldKey == .custom {
-            finishActiveHold()
+            cancelActiveHold()
         }
     }
 
@@ -3032,6 +2290,12 @@ final class HotkeyMonitor {
         guard activeHoldKey != nil else { return }
         activeHoldKey = nil
         onRelease()
+    }
+
+    private func cancelActiveHold() {
+        guard activeHoldKey != nil else { return }
+        activeHoldKey = nil
+        onCancel()
     }
 
     private func isKeyDown(_ key: HoldKey) -> Bool {
@@ -3311,6 +2575,7 @@ final class ShortcutSettingsController: NSObject, NSWindowDelegate {
         endCapture()
         pendingModifierBinding = nil
         model.isCapturing = true
+        NotificationCenter.default.post(name: .hotkeyCaptureDidBegin, object: nil)
 
         flagsMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
             self?.captureModifierEvent(event)
@@ -3369,12 +2634,16 @@ final class ShortcutSettingsController: NSObject, NSWindowDelegate {
     }
 
     private func endCapture() {
+        let wasCapturing = model.isCapturing
         if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
         if let flagsMonitor { NSEvent.removeMonitor(flagsMonitor) }
         keyMonitor = nil
         flagsMonitor = nil
         pendingModifierBinding = nil
         model.isCapturing = false
+        if wasCapturing {
+            NotificationCenter.default.post(name: .hotkeyCaptureDidEnd, object: nil)
+        }
     }
 }
 
@@ -3811,7 +3080,7 @@ final class StatusLampAnimator {
         case .recording: .listening
         case .transcribing: .processing
         case .done: .success
-        case .permissions, .missingColi, .installingColi: .warning
+        case .permissions: .warning
         case .updating: .updating
         case .error: .failure
         }
@@ -4020,10 +3289,9 @@ final class StatusLampAnimator {
 final class StatusItemController: NSObject {
     private enum MenuTag {
         static let record = 100
+        static let transcribeFile = 150
         static let update = 200
         static let microphone = 250
-        static let hotkeyBase = 300
-        static let triggerBase = 400
         static let polishBase = 600
         static let releaseMemory = 700
         static let translationBase = 800
@@ -4041,11 +3309,17 @@ final class StatusItemController: NSObject {
     init(appState: AppState) {
         self.appState = appState
         super.init()
+        if let button = statusItem.button {
+            button.title = ""
+            button.image = nil
+            button.imagePosition = .noImage
+        }
         lampAnimator = StatusLampAnimator(button: statusItem.button)
         configureMenu()
         configureDragDrop()
         updateTitle(for: appState.phase)
-        cancellable = appState.$phase.sink { [weak self] phase in
+        updateRecordMenuItem(for: appState.phase)
+        cancellable = appState.$phase.dropFirst().sink { [weak self] phase in
             self?.updateTitle(for: phase)
             self?.updateRecordMenuItem(for: phase)
         }
@@ -4095,6 +3369,7 @@ final class StatusItemController: NSObject {
 
         let transcribeItem = NSMenuItem(title: L("Transcribe File to Clipboard...", "转录文件到剪贴板..."), action: #selector(transcribeFile), keyEquivalent: "")
         transcribeItem.target = self
+        transcribeItem.tag = MenuTag.transcribeFile
         menu.addItem(transcribeItem)
 
         menu.addItem(NSMenuItem.separator())
@@ -4287,6 +3562,11 @@ final class StatusItemController: NSObject {
         default:
             item.title = L("Record · \(shortcutSummary)", "录音 · \(shortcutSummary)")
         }
+        let isIdle: Bool
+        if case .idle = phase { isIdle = true } else { isIdle = false }
+        statusItem.menu?.item(withTag: MenuTag.transcribeFile)?.isEnabled = isIdle
+        statusItem.menu?.item(withTag: MenuTag.releaseMemory)?.isEnabled = isIdle
+        statusItem.menu?.item(withTag: MenuTag.update)?.isEnabled = isIdle
     }
 
     private var shortcutSummary: String {
@@ -4300,9 +3580,6 @@ final class StatusItemController: NSObject {
     private func updateTitle(for phase: AppPhase) {
         guard let button = statusItem.button else { return }
         lampAnimator?.setPhase(phase)
-        button.title = ""
-        button.image = nil
-        button.imagePosition = .noImage
         lampAnimator?.updateLayout()
         button.toolTip = switch phase {
         case .idle: L("Ready · Local AI", "就绪 · 本地 AI")
@@ -4310,24 +3587,9 @@ final class StatusItemController: NSObject {
         case .transcribing: L("Processing locally…", "正在本地处理…")
         case .done: L("Ready to insert", "等待输入")
         case .permissions: L("Permission required", "需要权限")
-        case .missingColi, .installingColi: L("Local AI setup required", "需要配置本地 AI")
         case .updating: L("Checking custom updates…", "正在检查定制版更新…")
         case .error: L("CoveType needs attention", "CoveType 需要处理")
         }
-    }
-
-    @objc private func changeHotkey(_ sender: NSMenuItem) {
-        let idx = sender.tag - MenuTag.hotkeyBase
-        guard let mod = HotkeyModifier.allCases[safe: idx] else { return }
-        UserDefaults.standard.hotkeyModifier = mod
-        // Update checkmarks
-        sender.menu?.items.forEach { $0.state = $0.tag == sender.tag ? .on : .off }
-        // Refresh title + record item
-        if let phase = appState?.phase {
-            updateTitle(for: phase)
-            updateRecordMenuItem(for: phase)
-        }
-        NotificationCenter.default.post(name: .hotkeyConfigChanged, object: nil)
     }
 
     @objc private func changeMicrophone(_ sender: NSMenuItem) {
@@ -4337,14 +3599,6 @@ final class StatusItemController: NSObject {
             UserDefaults.standard.microphoneSelection = .automatic
         }
         refreshMicrophoneSubmenu()
-    }
-
-    @objc private func changeTriggerMode(_ sender: NSMenuItem) {
-        let idx = sender.tag - MenuTag.triggerBase
-        guard let mode = TriggerMode.allCases[safe: idx] else { return }
-        UserDefaults.standard.triggerMode = mode
-        sender.menu?.items.forEach { $0.state = $0.tag == sender.tag ? .on : .off }
-        NotificationCenter.default.post(name: .hotkeyConfigChanged, object: nil)
     }
 
     @objc private func changePolishMode(_ sender: NSMenuItem) {
@@ -4405,6 +3659,7 @@ final class StatusItemController: NSObject {
     }
 
     @objc private func transcribeFile() {
+        guard let appState, case .idle = appState.phase else { return }
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [
             .init(filenameExtension: "m4a")!,
@@ -4419,7 +3674,7 @@ final class StatusItemController: NSObject {
 
         if panel.runModal() == .OK, let url = panel.url {
             Task { @MainActor in
-                await appState?.transcribeFile(url)
+                await appState.transcribeFile(url)
             }
         }
     }
@@ -4435,7 +3690,8 @@ extension StatusItemController: NSWindowDelegate, NSMenuDelegate {
     }
 
     func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
-        guard let items = sender.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: nil) as? [URL],
+        guard let appState, case .idle = appState.phase,
+              let items = sender.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: nil) as? [URL],
               let url = items.first,
               ["m4a", "mp3", "wav", "aac"].contains(url.pathExtension.lowercased()) else {
             return []
@@ -4444,13 +3700,14 @@ extension StatusItemController: NSWindowDelegate, NSMenuDelegate {
     }
 
     func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
-        guard let items = sender.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: nil) as? [URL],
+        guard let appState, case .idle = appState.phase,
+              let items = sender.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: nil) as? [URL],
               let url = items.first else {
             return false
         }
 
         Task { @MainActor in
-            await appState?.transcribeFile(url)
+            await appState.transcribeFile(url)
         }
         return true
     }
@@ -4539,12 +3796,6 @@ final class OverlayPanelController {
             let y: CGFloat
 
             if case .permissions = appState.phase {
-                x = frame.maxX - width - 16
-                y = frame.maxY - height - 16
-            } else if case .missingColi = appState.phase {
-                x = frame.maxX - width - 16
-                y = frame.maxY - height - 16
-            } else if case .installingColi = appState.phase {
                 x = frame.maxX - width - 16
                 y = frame.maxY - height - 16
             } else {
@@ -4739,10 +3990,6 @@ struct OverlayView: View {
             switch appState.phase {
             case .permissions(let missing):
                 permissionView(missing: missing)
-            case .missingColi:
-                missingColiView
-            case .installingColi(let message):
-                installingColiView(message: message)
             case .idle:
                 EmptyView()
             default:
@@ -4910,91 +4157,6 @@ struct OverlayView: View {
         )
     }
 
-    var missingColiView: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
-                Image(systemName: "exclamationmark.triangle")
-                    .font(.system(size: 16))
-                    .foregroundStyle(.orange)
-                    .frame(width: 24)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(L("Node.js Required", "需要 Node.js"))
-                        .font(.system(size: 13, weight: .medium))
-                    Text(L("Install Node.js first, then CoveType will set up automatically.", "请先安装 Node.js，CoveType 将自动配置。"))
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-            }
-
-            HStack(spacing: 8) {
-                Text("https://nodejs.org")
-                    .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .padding(.leading, 36)
-
-                Button(action: {
-                    if let url = URL(string: "https://nodejs.org") {
-                        NSWorkspace.shared.open(url)
-                    }
-                }) {
-                    Image(systemName: "arrow.up.right.square")
-                        .font(.system(size: 10))
-                }
-                .buttonStyle(.borderless)
-                .help("Open nodejs.org")
-            }
-
-            HStack {
-                Text(L("Checking automatically...", "自动检测中..."))
-                    .font(.system(size: 11))
-                    .foregroundStyle(.tertiary)
-                Spacer()
-                Button(L("Cancel", "取消")) {
-                    appState.onCancel?()
-                }
-                .buttonStyle(.borderless)
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-            }
-        }
-        .padding(16)
-        .frame(width: 400)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
-        )
-    }
-
-    func installingColiView(message: String) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
-                ProgressView()
-                    .controlSize(.small)
-                    .frame(width: 24)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(L("Setting up speech engine", "配置语音引擎"))
-                        .font(.system(size: 13, weight: .medium))
-                    Text(message)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-            }
-        }
-        .padding(16)
-        .frame(width: 400)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
-        )
-    }
 }
 
 // MARK: - Update Service
@@ -5177,14 +4339,8 @@ if let diagnosticIndex = CommandLine.arguments.firstIndex(of: "--keyboard-diagno
             await service.prewarm(loadASR: true, loadPolisher: true)
             let raw = try await service.transcribe(fileURL: URL(fileURLWithPath: audioPath))
             print("SELF_TEST_RAW=\(raw)")
-            do {
-                let polished = try await service.polish(text: raw, mode: .light)
-                print("SELF_TEST_POLISHED=\(polished)")
-            } catch {
-                // Production dictation returns the validated ASR text when the
-                // optional small polishing model rejects or over-rewrites it.
-                print("SELF_TEST_POLISH_FALLBACK=PASS reason=\(error.localizedDescription)")
-            }
+            let polished = try await service.polish(text: raw, mode: .light)
+            print("SELF_TEST_POLISHED=\(polished)")
             service.shutdown()
             exit(EXIT_SUCCESS)
         } catch {

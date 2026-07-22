@@ -4,6 +4,8 @@ This Cloudflare Worker accepts one best-effort heartbeat per CoveType installati
 
 The Worker converts the installation UUID to a server-secret HMAC before storage. Raw identifiers are never stored. Daily activity is retained for 90 days; installations inactive for 365 days are deleted by the scheduled cleanup. The protected `/v1/stats` response exposes aggregate counts only.
 
+Two Cloudflare Rate Limiting bindings protect the public receiver: one limits repeated submissions for the same installation UUID and one caps bursts from the same request source. The request source is used only as an ephemeral edge rate-limit key and is never written to D1. Because the client is open source and intentionally account-free, these statistics are approximate rather than an attested device count.
+
 Endpoints:
 
 - `POST /v1/heartbeat` — public, validated heartbeat receiver.

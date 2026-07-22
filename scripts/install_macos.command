@@ -19,7 +19,6 @@ MODELS_DIR="$APP_SUPPORT_DIR/models"
 TOOLS_DIR="$APP_SUPPORT_DIR/tools"
 UV_PYTHON_DIR="$APP_SUPPORT_DIR/python-builds"
 UV_CACHE_DIR="$APP_SUPPORT_DIR/uv-cache"
-BACKUP_DIR="$APP_SUPPORT_DIR/backups"
 SYSTEM_APPLICATIONS_DIR="/Applications"
 USER_APPLICATIONS_DIR="$HOME/Applications"
 INSTALL_DIR=""
@@ -28,7 +27,10 @@ ASR_MODEL_DIR="$MODELS_DIR/Qwen3-ASR-0.6B-8bit"
 POLISH_MODEL_DIR="$MODELS_DIR/Qwen3.5-0.8B-4bit"
 ASR_REPO="mlx-community/Qwen3-ASR-0.6B-8bit"
 POLISH_REPO="mlx-community/Qwen3.5-0.8B-4bit"
+ASR_REVISION="89e96d92ba34aca20b3e29fb10cc284097d1219f"
+POLISH_REVISION="da28692b5f139cb0ec58a356b437486b7dac7462"
 UV_VERSION="0.11.30"
+UV_INSTALLER_SHA256="f633daff5c2a1b5e550d5dab074f21ab2d5fda2d147babf4525844ff1276e57e"
 SKIP_LAUNCH=0
 SKIP_MODEL_TEST=0
 PERMISSIONS_ONLY=0
@@ -328,7 +330,7 @@ done
 OS_MAJOR="$(sw_vers -productVersion | cut -d. -f1)"
 [[ "$OS_MAJOR" -ge 15 ]] || fail "CoveType instant translation requires macOS 15 or later."
 
-mkdir -p "$APP_SUPPORT_DIR" "$MODELS_DIR" "$TOOLS_DIR" "$UV_PYTHON_DIR" "$UV_CACHE_DIR" "$BACKUP_DIR"
+mkdir -p "$APP_SUPPORT_DIR" "$MODELS_DIR" "$TOOLS_DIR" "$UV_PYTHON_DIR" "$UV_CACHE_DIR"
 
 if [[ -z "$INSTALL_DIR" ]]; then
     if [[ -w "$SYSTEM_APPLICATIONS_DIR" || -w "$SYSTEM_APPLICATIONS_DIR/$PRODUCT_APP_NAME" ]]; then
@@ -409,6 +411,8 @@ if [[ ! -x "$UV_BIN" ]]; then
     curl --fail --location --silent --show-error \
         "https://astral.sh/uv/$UV_VERSION/install.sh" \
         --output "$UV_INSTALLER"
+    [[ "$(shasum -a 256 "$UV_INSTALLER" | awk '{print $1}')" == "$UV_INSTALLER_SHA256" ]] \
+        || fail "uv installer checksum verification failed."
     UV_UNMANAGED_INSTALL="$TOOLS_DIR" sh "$UV_INSTALLER"
 fi
 [[ -x "$UV_BIN" ]] || fail "uv installation failed."
@@ -419,8 +423,8 @@ export UV_CACHE_DIR
 if [[ -x "$RUNTIME_DIR/bin/python" ]]; then
     RUNTIME_MINOR="$("$RUNTIME_DIR/bin/python" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
     if [[ "$RUNTIME_MINOR" != "3.12" ]]; then
-        RUNTIME_BACKUP="$BACKUP_DIR/mlx-runtime-before-$(date +%Y%m%d-%H%M%S)"
-        log "Preserving incompatible Python runtime at $RUNTIME_BACKUP"
+        RUNTIME_BACKUP="$TEMP_DIR/incompatible-mlx-runtime"
+        log "Moving the incompatible Python runtime aside during installation"
         mv "$RUNTIME_DIR" "$RUNTIME_BACKUP"
     fi
 fi
@@ -462,33 +466,60 @@ else
     runtime_matches_requirements || fail "The MLX runtime does not match the pinned requirements."
 fi
 
+model_is_complete() {
+    local destination="$1"
+    local revision="$2"
+    "$RUNTIME_DIR/bin/python" - "$destination" "$revision" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+if not (root / ".covetype-revision").is_file() or (root / ".covetype-revision").read_text().strip() != sys.argv[2]:
+    raise SystemExit(1)
+if not (root / "config.json").is_file():
+    raise SystemExit(1)
+index_path = root / "model.safetensors.index.json"
+if index_path.is_file():
+    index = json.loads(index_path.read_text(encoding="utf-8"))
+    shards = set(index.get("weight_map", {}).values())
+    if not shards or any(not (root / shard).is_file() or (root / shard).stat().st_size == 0 for shard in shards):
+        raise SystemExit(1)
+elif not (root / "model.safetensors").is_file() or (root / "model.safetensors").stat().st_size == 0:
+    raise SystemExit(1)
+PY
+}
+
 download_model() {
     local repo_id="$1"
     local destination="$2"
     local display_name="$3"
+    local revision="$4"
 
-    if [[ -f "$destination/config.json" && -f "$destination/model.safetensors.index.json" ]]; then
+    if model_is_complete "$destination" "$revision"; then
         log "$display_name is already installed"
         return
     fi
 
     log "Downloading $display_name from Hugging Face (resumable)"
     mkdir -p "$destination"
-    "$RUNTIME_DIR/bin/python" - "$repo_id" "$destination" <<'PY'
+    "$RUNTIME_DIR/bin/python" - "$repo_id" "$destination" "$revision" <<'PY'
 import sys
+from pathlib import Path
 from huggingface_hub import snapshot_download
 
 snapshot_download(
     repo_id=sys.argv[1],
     local_dir=sys.argv[2],
+    revision=sys.argv[3],
 )
+(Path(sys.argv[2]) / ".covetype-revision").write_text(sys.argv[3] + "\n", encoding="utf-8")
 PY
-    [[ -f "$destination/config.json" ]] || fail "$display_name download is incomplete."
-    [[ -f "$destination/model.safetensors.index.json" ]] || fail "$display_name weights are incomplete."
+    model_is_complete "$destination" "$revision" || fail "$display_name download is incomplete."
 }
 
-download_model "$ASR_REPO" "$ASR_MODEL_DIR" "Qwen3-ASR 0.6B 8-bit"
-download_model "$POLISH_REPO" "$POLISH_MODEL_DIR" "Qwen3.5 0.8B 4-bit"
+download_model "$ASR_REPO" "$ASR_MODEL_DIR" "Qwen3-ASR 0.6B 8-bit" "$ASR_REVISION"
+download_model "$POLISH_REPO" "$POLISH_MODEL_DIR" "Qwen3.5 0.8B 4-bit" "$POLISH_REVISION"
 
 log "Stopping the previous CoveType instance"
 osascript -e 'tell application "CoveType" to quit' >/dev/null 2>&1 || true
@@ -505,8 +536,8 @@ fi
 
 APP_BACKUP=""
 if [[ -d "$INSTALL_APP" ]]; then
-    APP_BACKUP="$BACKUP_DIR/CoveType-before-$(date +%Y%m%d-%H%M%S).app.zip"
-    log "Preserving the previous app at $APP_BACKUP"
+    APP_BACKUP="$TEMP_DIR/CoveType-rollback.app.zip"
+    log "Creating a temporary rollback copy"
     ditto -c -k --keepParent "$INSTALL_APP" "$APP_BACKUP"
 
     # Keep the outer .app directory in place. Moving the whole bundle causes
@@ -539,18 +570,14 @@ fi
 LSREGISTER_BIN="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
 if [[ -x "$LSREGISTER_BIN" ]]; then
     [[ "$SOURCE_APP" == "$INSTALL_APP" ]] || "$LSREGISTER_BIN" -u "$SOURCE_APP" >/dev/null 2>&1 || true
-    find "$BACKUP_DIR" -type d -name '*.app' -prune -print0 2>/dev/null | while IFS= read -r -d '' old_app_bundle; do
-        "$LSREGISTER_BIN" -u "$old_app_bundle" >/dev/null 2>&1 || true
-    done
     "$LSREGISTER_BIN" -f "$INSTALL_APP" >/dev/null 2>&1 || true
 fi
 
-log "Applying portable defaults"
-defaults write ai.covetype.app ai.covetype.app.polishMode -string Light
-defaults write ai.covetype.app ai.covetype.app.translationTarget -string English
-defaults delete ai.covetype.app ai.covetype.app.hotkeyModifier >/dev/null 2>&1 || true
-defaults delete ai.covetype.app ai.covetype.app.triggerMode >/dev/null 2>&1 || true
-defaults delete ai.covetype.app ai.covetype.app.microphone >/dev/null 2>&1 || true
+log "Applying defaults for settings that have not been chosen yet"
+defaults read ai.covetype.app ai.covetype.app.polishMode >/dev/null 2>&1 \
+    || defaults write ai.covetype.app ai.covetype.app.polishMode -string Light
+defaults read ai.covetype.app ai.covetype.app.translationTarget >/dev/null 2>&1 \
+    || defaults write ai.covetype.app ai.covetype.app.translationTarget -string English
 
 log "Running runtime and shortcut checks"
 "$RUNTIME_DIR/bin/python" -c 'import mlx, mlx_audio, mlx_lm; print("MLX_RUNTIME=PASS")'
@@ -580,7 +607,6 @@ fi
 if [[ -n "$APP_BACKUP" && -f "$APP_BACKUP" ]]; then
     log "Removing the temporary rollback copy"
     find "$APP_BACKUP" -delete
-    rmdir "$BACKUP_DIR" >/dev/null 2>&1 || true
 fi
 
 log "Enabling CoveType at login"

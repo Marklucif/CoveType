@@ -7,8 +7,13 @@ param(
 
 $ErrorActionPreference = "Stop"
 $UvVersion = "0.11.30"
+$UvInstallerSha256 = "c0ef721dc22c4a992b3218091cc7658e968194b7952e67945a71fa0bdce2b2c1"
 $TorchVersion = "2.12.0"
 $QwenAsrVersion = "0.0.6"
+$HuggingFaceHubVersion = "1.24.0"
+$SoundDeviceVersion = "0.5.5"
+$NumpyVersion = "2.5.1"
+$AsrRevision = "5eb144179a02acc5e5ba31e748d22b0cf3e303b0"
 $Root = Join-Path $env:LOCALAPPDATA "CoveType"
 $Tools = Join-Path $Root "tools"
 $Runtime = Join-Path $Root "runtime"
@@ -34,8 +39,17 @@ if (-not (Test-Path $Uv)) {
     Write-Host "Installing uv $UvVersion..."
     $UvInstaller = Join-Path $env:TEMP "covetype-uv-install.ps1"
     Invoke-WebRequest "https://astral.sh/uv/$UvVersion/install.ps1" -UseBasicParsing -OutFile $UvInstaller
+    $ActualUvHash = (Get-FileHash -Algorithm SHA256 -Path $UvInstaller).Hash.ToLowerInvariant()
+    if ($ActualUvHash -ne $UvInstallerSha256) {
+        Remove-Item -Force $UvInstaller
+        throw "uv installer checksum verification failed."
+    }
     $env:UV_UNMANAGED_INSTALL = $Tools
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $UvInstaller
+    try {
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $UvInstaller
+    } finally {
+        Remove-Item -Force -ErrorAction SilentlyContinue $UvInstaller
+    }
 }
 if (-not (Test-Path $Uv)) {
     throw "uv installation failed."
@@ -62,16 +76,34 @@ switch ($Backend) {
 
 Write-Host "Installing PyTorch $TorchVersion backend: $Backend"
 & $Uv pip install --python $Python "torch==$TorchVersion" --index-url $TorchIndex
-& $Uv pip install --python $Python --upgrade "qwen-asr==$QwenAsrVersion" huggingface_hub sounddevice numpy
+& $Uv pip install --python $Python --upgrade `
+    "qwen-asr==$QwenAsrVersion" `
+    "huggingface-hub==$HuggingFaceHubVersion" `
+    "sounddevice==$SoundDeviceVersion" `
+    "numpy==$NumpyVersion"
 
 if (-not $SkipModelDownload) {
     Write-Host "Downloading Qwen3-ASR 0.6B..."
     $DownloadCode = @'
 import sys
+import json
+from pathlib import Path
 from huggingface_hub import snapshot_download
-snapshot_download(repo_id="Qwen/Qwen3-ASR-0.6B", local_dir=sys.argv[1])
+
+root = Path(sys.argv[1])
+revision = sys.argv[2]
+snapshot_download(repo_id="Qwen/Qwen3-ASR-0.6B", revision=revision, local_dir=root)
+if not (root / "config.json").is_file():
+    raise SystemExit("Qwen3-ASR config is missing")
+index_path = root / "model.safetensors.index.json"
+if index_path.is_file():
+    shards = set(json.loads(index_path.read_text(encoding="utf-8")).get("weight_map", {}).values())
+    if not shards or any(not (root / shard).is_file() or (root / shard).stat().st_size == 0 for shard in shards):
+        raise SystemExit("Qwen3-ASR weights are incomplete")
+elif not (root / "model.safetensors").is_file() or (root / "model.safetensors").stat().st_size == 0:
+    raise SystemExit("Qwen3-ASR weights are missing")
 '@
-    & $Python -c $DownloadCode $AsrModel
+    & $Python -c $DownloadCode $AsrModel $AsrRevision
 }
 
 $HealthCode = @'

@@ -732,6 +732,12 @@ final class AppState: ObservableObject {
         onOverlayRequest?(true)
     }
 
+    private func finishNoSpeech(expectedFlowID flowID: UUID) {
+        // Silence is a normal outcome, not a user-facing error. Close the
+        // overlay immediately and leave the warm ASR worker ready for retry.
+        resetState(expectedFlowID: flowID)
+    }
+
     func transcribeAndInsert() async {
         guard let flowID = activeFlowID else { return }
         guard let url = currentRecordingURL else {
@@ -753,6 +759,10 @@ final class AppState: ObservableObject {
             confirmInsert(expectedFlowID: flowID)
         } catch is CancellationError {
             // User canceled the current transcription with Esc.
+        } catch CoveTypeError.emptyTranscript {
+            if activeFlowID == flowID {
+                finishNoSpeech(expectedFlowID: flowID)
+            }
         } catch {
             if activeFlowID == flowID {
                 showError(error.localizedDescription)
@@ -919,6 +929,10 @@ final class AppState: ObservableObject {
             resetState(expectedFlowID: flowID)
         } catch is CancellationError {
             // User canceled the current transcription with Esc.
+        } catch CoveTypeError.emptyTranscript {
+            if activeFlowID == flowID {
+                finishNoSpeech(expectedFlowID: flowID)
+            }
         } catch {
             if activeFlowID == flowID {
                 showError(error.localizedDescription)
@@ -1483,6 +1497,12 @@ private struct LocalAIResponse: Decodable, Sendable {
     let ready: Bool?
     let text: String?
     let error: String?
+    let errorCode: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, ok, ready, text, error
+        case errorCode = "error_code"
+    }
 }
 
 final class LocalAIService: @unchecked Sendable {
@@ -1600,6 +1620,12 @@ final class LocalAIService: @unchecked Sendable {
                             throw CoveTypeError.localAIProtocolError("Mismatched worker response")
                         }
                         guard response.ok == true else {
+                            if response.errorCode == "no_speech" {
+                                // This is an expected recognition outcome. Do
+                                // not discard the warm Qwen3-ASR process.
+                                continuation.resume(throwing: CoveTypeError.emptyTranscript)
+                                return
+                            }
                             throw CoveTypeError.localAIProtocolError(response.error ?? "Unknown worker error")
                         }
                         continuation.resume(returning: response)
@@ -2015,6 +2041,52 @@ final class HotkeyMonitor {
         )
 
         let customExpected = ["press", "release"]
+        let configuredHoldDuration = UserDefaults.standard.shortcutHoldDuration
+        var durationEvents: [String] = []
+        var gestureStartedAt = ProcessInfo.processInfo.systemUptime
+        var measuredThreshold: TimeInterval?
+        let durationMonitor = HotkeyMonitor(
+            onToggle: { durationEvents.append("toggle") },
+            onPress: {
+                measuredThreshold = ProcessInfo.processInfo.systemUptime - gestureStartedAt
+                durationEvents.append("press")
+            },
+            onRelease: { durationEvents.append("release") },
+            onCancel: { durationEvents.append("cancel") },
+            customBinding: customBinding,
+            holdDuration: configuredHoldDuration,
+            loadStoredShortcut: false
+        )
+
+        // Releasing before the configured duration must do nothing.
+        gestureStartedAt = ProcessInfo.processInfo.systemUptime
+        durationMonitor.handleKeyEvent(
+            keyEvent(type: .keyDown, keyCode: 40, flags: .control, characters: "k")
+        )
+        let shortHoldMilliseconds = max(30, Int(configuredHoldDuration * 450))
+        try? await Task.sleep(for: .milliseconds(shortHoldMilliseconds))
+        durationMonitor.handleKeyEvent(
+            keyEvent(type: .keyUp, keyCode: 40, flags: .control, characters: "k")
+        )
+        try? await Task.sleep(for: .milliseconds(Int(configuredHoldDuration * 650) + 80))
+        let shortHoldWasSuppressed = durationEvents.isEmpty
+
+        // Holding beyond the configured duration must press only after the
+        // threshold, then release immediately with the physical key-up.
+        gestureStartedAt = ProcessInfo.processInfo.systemUptime
+        durationMonitor.handleKeyEvent(
+            keyEvent(type: .keyDown, keyCode: 40, flags: .control, characters: "k")
+        )
+        try? await Task.sleep(for: .milliseconds(Int(configuredHoldDuration * 1_000) + 160))
+        durationMonitor.handleKeyEvent(
+            keyEvent(type: .keyUp, keyCode: 40, flags: .control, characters: "k")
+        )
+        let thresholdWasRespected = measuredThreshold.map {
+            $0 >= configuredHoldDuration - 0.025
+                && $0 <= configuredHoldDuration + 0.50
+        } ?? false
+        let durationExpected = ["press", "release"]
+
         var modifierRecoveryEvents: [String] = []
         let commandBinding = CustomShortcutBinding(
             keyCode: 55,
@@ -2049,9 +2121,16 @@ final class HotkeyMonitor {
         let modifierRecoveryExpected = ["press", "release", "press", "release"]
         let passed = events == expected
             && customEvents == customExpected
+            && shortHoldWasSuppressed
+            && durationEvents == durationExpected
+            && thresholdWasRespected
             && modifierRecoveryEvents == modifierRecoveryExpected
         print("HOTKEY_SELF_TEST_EVENTS=\(events.joined(separator: ","))")
         print("CUSTOM_HOTKEY_SELF_TEST_EVENTS=\(customEvents.joined(separator: ","))")
+        print("HOLD_DURATION_SELF_TEST_CONFIGURED=\(String(format: "%.2f", configuredHoldDuration))")
+        print("HOLD_DURATION_SELF_TEST_MEASURED=\(String(format: "%.3f", measuredThreshold ?? -1))")
+        print("HOLD_DURATION_SHORT_RESULT=\(shortHoldWasSuppressed ? "PASS" : "FAIL")")
+        print("HOLD_DURATION_LONG_RESULT=\(durationEvents == durationExpected && thresholdWasRespected ? "PASS" : "FAIL")")
         print("MODIFIER_RECOVERY_SELF_TEST_EVENTS=\(modifierRecoveryEvents.joined(separator: ","))")
         print("HOTKEY_SELF_TEST_RESULT=\(passed ? "PASS" : "FAIL")")
         return passed

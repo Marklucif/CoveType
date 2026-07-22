@@ -31,6 +31,32 @@ find_codesign_identity() {
     fi
 }
 
+sign_release_app() {
+    local identity="$1"
+    local attempt
+
+    # Apple's secure timestamp endpoint can occasionally fail through a VPN or
+    # PAC proxy even while the rest of developer.apple.com is reachable. Retry
+    # the complete signing operation before failing the release build.
+    for attempt in 1 2 3; do
+        if codesign --force --sign "$identity" \
+            --entitlements "$ENTITLEMENTS" \
+            --options runtime \
+            --timestamp \
+            "$APP_DIR"; then
+            return 0
+        fi
+        if [ "$attempt" -lt 3 ]; then
+            echo "Secure timestamp failed (attempt $attempt of 3); retrying..." >&2
+            sleep "$((attempt * 2))"
+        fi
+    done
+
+    echo "Code signing failed after 3 secure timestamp attempts." >&2
+    echo "If a VPN is active, route timestamp.apple.com directly and retry." >&2
+    return 1
+}
+
 mkdir -p "$ROOT_DIR/dist"
 
 echo "==> Building CoveType (Universal Binary: arm64 + x86_64)..."
@@ -61,11 +87,7 @@ chmod +x "$MACOS_DIR/CoveType"
 CODE_SIGN_NAME="$(find_codesign_identity)"
 if [ -n "$CODE_SIGN_NAME" ]; then
     echo "==> Signing with: $CODE_SIGN_NAME"
-    codesign --force --sign "$CODE_SIGN_NAME" \
-        --entitlements "$ENTITLEMENTS" \
-        --options runtime \
-        --timestamp \
-        "$APP_DIR"
+    sign_release_app "$CODE_SIGN_NAME"
 
     echo "==> Verifying signature..."
     codesign --verify --verbose=2 "$APP_DIR"

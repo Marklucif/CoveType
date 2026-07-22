@@ -2,6 +2,7 @@ import importlib.util
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -47,6 +48,22 @@ class LocalAIWorkerTests(unittest.TestCase):
                 encoding="utf-8",
             )
             self.assertFalse(WORKER.model_is_complete(model, "test"))
+
+    def test_empty_asr_result_is_recoverable_no_speech(self):
+        class EmptyResult:
+            text = ""
+            language = None
+
+        class EmptyModel:
+            @staticmethod
+            def generate(*_args, **_kwargs):
+                return EmptyResult()
+
+        with tempfile.NamedTemporaryFile(suffix=".wav") as audio:
+            with mock.patch.object(WORKER, "load_asr", return_value=EmptyModel()):
+                with self.assertRaises(WORKER.NoSpeechDetectedError) as raised:
+                    WORKER.transcribe(audio.name)
+        self.assertEqual(raised.exception.error_code, "no_speech")
 
 
 if __name__ == "__main__":

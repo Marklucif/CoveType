@@ -34,6 +34,16 @@ _polish_model: Any = None
 _polish_tokenizer: Any = None
 
 
+class LocalAIWorkerError(RuntimeError):
+    """An expected worker failure that the client can handle without a restart."""
+
+    error_code = "worker_error"
+
+
+class NoSpeechDetectedError(LocalAIWorkerError):
+    error_code = "no_speech"
+
+
 def emit(payload: dict[str, Any]) -> None:
     print(json.dumps(payload, ensure_ascii=False, separators=(",", ":")), flush=True)
 
@@ -102,7 +112,10 @@ def transcribe(audio_path: str, language: str | None = None) -> dict[str, Any]:
         )
     text = str(getattr(result, "text", "")).strip()
     if not text:
-        raise RuntimeError("Qwen3-ASR returned an empty transcript")
+        # Silence and very short recordings are valid user input outcomes, not
+        # protocol failures. Let the client finish the gesture silently while
+        # keeping this already-loaded model process alive for the next attempt.
+        raise NoSpeechDetectedError("No speech was detected in the recording")
     detected_language = getattr(result, "language", None)
     if isinstance(detected_language, list):
         detected_language = detected_language[0] if detected_language else None
@@ -372,8 +385,14 @@ def main() -> None:
             if action == "shutdown":
                 return
         except Exception as error:
-            traceback.print_exc(file=sys.stderr)
-            emit({"id": request_id, "ok": False, "error": str(error)})
+            if not isinstance(error, LocalAIWorkerError):
+                traceback.print_exc(file=sys.stderr)
+            emit({
+                "id": request_id,
+                "ok": False,
+                "error": str(error),
+                "error_code": getattr(error, "error_code", "worker_error"),
+            })
 
 
 if __name__ == "__main__":

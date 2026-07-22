@@ -2,7 +2,7 @@
 
 [中文](README_CN.md) | [Windows plan](docs/WINDOWS.md)
 
-[Website](https://covetype.com/) · [Download](https://github.com/Marklucif/CoveType/releases/tag/v2.1.7-beta.1) · [Feedback](https://github.com/Marklucif/CoveType/issues/new) · [Privacy](docs/PRIVACY.md) · [Upstream](https://github.com/marswaveai/TypeNo)
+[Website](https://covetype.com/) · [Download](https://github.com/Marklucif/CoveType/releases/tag/v2.1.8-beta.1) · [Feedback](https://github.com/Marklucif/CoveType/issues/new) · [Privacy](docs/PRIVACY.md) · [Upstream](https://github.com/marswaveai/TypeNo)
 
 **CoveType** is a privacy-first, local-AI voice-input app for macOS, derived from the open-source TypeNo project. Hold a shortcut to speak, release it to transcribe locally with Qwen3-ASR, optionally polish or translate on device, and paste the result back into the previous app.
 
@@ -34,13 +34,13 @@ Open menu-bar CoveType → **Shortcut Settings…** to record the physical key/k
 
 ## Automated macOS installation
 
-Use `dist/CoveType-2.1.7-macOS-AppleSilicon-Installer.zip`, extract it, then open `Install CoveType.command`. The installer sets up the app, isolated Python/MLX runtime, both models, launch at login, defaults, and post-install self-tests. Its permission guide follows the macOS default language, opens the correct System Settings pages, and verifies the result. Updates replace the bundle contents in place. Custom shortcut settings are preserved across upgrades.
+Use `dist/CoveType-2.1.8-macOS-AppleSilicon-Installer.zip`, extract it, then open `Install CoveType.command`. The installer sets up the app, isolated Python/MLX runtime, both models, launch at login, defaults, and post-install self-tests. Its permission guide follows the macOS default language, opens the correct System Settings pages, and verifies the result. Updates replace the bundle contents in place. Custom shortcut settings are preserved across upgrades.
 
 CoveType does not query or install releases from `marswaveai/TypeNo`. It uses its own manifest and releases under `Marklucif/CoveType`. See [custom update channel](docs/UPDATE_CHANNEL.md).
 
 The menu-bar **Send Feedback…** window prepares a new issue in `Marklucif/CoveType` for the user to review before publishing. It never sends feedback silently, and **Copy Feedback** remains available without a network request.
 
-The first binary is published as a public preview because Apple notarization credentials are not configured in this development environment. The app is Developer ID signed, but a downloaded build may still require **Control-click → Open** on first launch. Source builds are unaffected.
+CoveType 2.1.8 is signed with a Developer ID Application certificate, accepted by the Apple notary service, and distributed with a stapled notarization ticket. Gatekeeper therefore recognizes the official download as a **Notarized Developer ID** application.
 
 Requirements: Apple Silicon, macOS 15 or later, an internet connection for first install, and 5 GB free disk space. See [the full macOS installation guide](docs/MACOS_AUTOMATED_INSTALL.md).
 

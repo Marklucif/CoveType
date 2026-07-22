@@ -63,8 +63,14 @@ for (const [relativePath] of pages) {
   if (!html.includes('class="telemetry-disclosure"')) {
     throw new Error(`${relativePath}: telemetry disclosure missing`);
   }
-  if (/v2\.1\.[456]-beta\.1|CoveType-2\.1\.[456]-macOS/.test(html)) {
+  if (/v2\.1\.[4-7]-beta\.1|CoveType-2\.1\.[4-7]-macOS/.test(html)) {
     throw new Error(`${relativePath}: outdated download link found`);
+  }
+  if (!html.includes("v2.1.8-beta.1/CoveType-2.1.8-macOS-AppleSilicon-Installer.zip")) {
+    throw new Error(`${relativePath}: current download link missing`);
+  }
+  if (!html.includes("659c719f6b1f5c11b4f2086e0d063e4c860bacb6cf9d7d7da1745506bfd47a3c")) {
+    throw new Error(`${relativePath}: current installer checksum missing`);
   }
 }
 

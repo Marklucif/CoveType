@@ -2,7 +2,7 @@
 
 [English](README.md) | [Windows 方案](docs/WINDOWS.md)
 
-[产品网站](https://covetype.com/) · [下载安装](https://github.com/Marklucif/CoveType/releases/tag/v2.1.7-beta.1) · [使用反馈](https://github.com/Marklucif/CoveType/issues/new) · [隐私说明](docs/PRIVACY.md) · [上游项目](https://github.com/marswaveai/TypeNo)
+[产品网站](https://covetype.com/) · [下载安装](https://github.com/Marklucif/CoveType/releases/tag/v2.1.8-beta.1) · [使用反馈](https://github.com/Marklucif/CoveType/issues/new) · [隐私说明](docs/PRIVACY.md) · [上游项目](https://github.com/marswaveai/TypeNo)
 
 **CoveType** 是一款主打隐私和本地 AI 的 macOS 语音输入工具，基于开源 TypeNo 项目二次开发。按住快捷键说话，松开后由本地 Qwen3-ASR 识别，可选本地润色或 Apple 设备端即时翻译，结果自动粘贴到原应用。
 
@@ -35,13 +35,13 @@
 
 ## 自动安装
 
-完整安装包位于 `dist/CoveType-2.1.7-macOS-AppleSilicon-Installer.zip`。解压后双击 `Install CoveType.command`，脚本会自动安装应用、独立 Python/MLX 环境、两个模型、登录时自启动、默认配置并运行自检。权限向导会按照 macOS 默认语言显示说明、打开系统设置并检测授权结果。应用更新采用原位替换；用户录制的快捷键与按住时长也会保留。
+完整安装包位于 `dist/CoveType-2.1.8-macOS-AppleSilicon-Installer.zip`。解压后双击 `Install CoveType.command`，脚本会自动安装应用、独立 Python/MLX 环境、两个模型、登录时自启动、默认配置并运行自检。权限向导会按照 macOS 默认语言显示说明、打开系统设置并检测授权结果。应用更新采用原位替换；用户录制的快捷键与按住时长也会保留。
 
 CoveType 不会查询或安装 `marswaveai/TypeNo` 的原版发布，而是使用 `Marklucif/CoveType` 自己的更新清单和 Release。详见 [独立更新通道说明](docs/UPDATE_CHANNEL.md)。
 
 菜单栏中的“使用反馈…”会生成 `Marklucif/CoveType` 的新 Issue 草稿，让用户检查后再公开提交；客户端不会静默发送反馈，也可以只在本地复制内容。
 
-首个二进制版本作为公开预览版发布，因为当前开发环境尚未配置 Apple 公证凭据。应用已经使用 Developer ID 签名，但其他 Mac 首次打开下载版本时仍可能需要使用“按住 Control 点击 → 打开”。从源码构建不受影响。
+CoveType 2.1.8 已使用 Developer ID Application 证书签名，通过 Apple 公证服务，并在应用中装订公证票据。Gatekeeper 会把官方下载识别为 **Notarized Developer ID** 应用。
 
 支持 Apple 芯片与 macOS 15 以上版本，首次安装需要联网及至少 5 GB 可用空间。详见 [macOS 自动安装说明](docs/MACOS_AUTOMATED_INSTALL.md)。
 
@@ -61,7 +61,7 @@ Windows 不能直接运行 AppKit/SwiftUI、AVFoundation、Apple Translation 与
 
 - 新安装应用：`/Applications/CoveType.app`，无系统目录写入权限时为 `~/Applications/CoveType.app`。
 - 更新时会保留同一个 `CoveType.app` 外层目录并原位替换内容。
-- 模型、独立运行环境与版本备份统一位于 `~/Library/Application Support/CoveType`。
+- 模型与独立运行环境位于 `~/Library/Application Support/CoveType`；安装完成后不会长期保留旧应用备份。
 
 ## 许可证与上游
 
